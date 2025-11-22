@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./scripts/opensearch_up.sh:*)",
+      "Read(//Users/r/Documents/Development/Personal/Startups/olx_clone/**)",
+      "Bash(source:*)",
+      "Bash(python manage.py migrate:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
