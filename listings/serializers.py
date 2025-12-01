@@ -21,7 +21,7 @@ class ListingMediaSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj):  # pragma: no cover
         request = self.context.get("request")
         if request:
-            return request.build_absolute_uri(obj.image.url)
+            return obj.image.url#request.build_absolute_uri(obj.image.url)
         return obj.image.url
 
 

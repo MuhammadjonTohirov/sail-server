@@ -29,12 +29,13 @@ class FavoriteListingSerializer(serializers.ModelSerializer):
 
     def get_listing_media_urls(self, obj):
         media = obj.listing.media.all()[:1]  # Get first image
-        request = self.context.get('request')
-        if media and request:
-            return [request.build_absolute_uri(m.image.url) for m in media]
-        elif media:
-            return [m.image.url for m in media]
-        return []
+        # request = self.context.get('request')
+        # if media and request:
+        #     return [m.image.url for m in media]
+        # elif media:
+        #     return [m.image.url for m in media]
+        
+        return [m.image.url for m in media]
 
 
 class RecentlyViewedListingSerializer(serializers.ModelSerializer):

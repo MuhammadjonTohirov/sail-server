@@ -52,13 +52,7 @@ def _snapshot_for_listing(listing: Listing, request) -> ListingSnapshot:
     if candidate and getattr(candidate, "image", None):
         try:
             url = candidate.image.url
-            if request is not None:
-                try:
-                    thumbnail_url = request.build_absolute_uri(url)
-                except Exception:
-                    thumbnail_url = url
-            else:
-                thumbnail_url = url
+            thumbnail_url = url
         except ValueError:
             thumbnail_url = ""
 
