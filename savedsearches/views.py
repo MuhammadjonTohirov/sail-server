@@ -8,8 +8,8 @@ from rest_framework.views import APIView
 
 from .models import SavedSearch
 from .serializers import SavedSearchSerializer
-from searchapp.opensearch_client import get_client
-from searchapp.index import index_name
+from searchapp.views.opensearch_client import get_client
+from searchapp.views.index import index_name
 
 
 class SavedSearchListCreateView(generics.ListCreateAPIView):

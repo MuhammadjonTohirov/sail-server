@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from celery import shared_task
 
-from .index import delete_listing, index_listing
+from .views.index import delete_listing, index_listing
 
 
 @shared_task(name="search.index_listing")

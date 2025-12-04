@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from searchapp.index import ensure_index
+from searchapp.views.index import ensure_index
 
 
 class Command(BaseCommand):

@@ -6,7 +6,7 @@ from celery import shared_task
 
 from .models import SavedSearch
 from searchapp.opensearch_client import get_client
-from searchapp.index import index_name
+from searchapp.views.index import index_name
 
 
 @shared_task(name="savedsearches.run")

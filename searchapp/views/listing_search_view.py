@@ -323,7 +323,7 @@ class ListingSearchView(APIView):
                             base_currency_code,
                             currency
                         )
-                        min_price_display = float(converted_min) if converted_min is not None else min_price_normalized
+                        min__display = float(converted_min) if converted_min is not None else min_price_normalized
                     else:
                         min_price_display = None
 

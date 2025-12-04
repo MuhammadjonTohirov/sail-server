@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 
 from searchapp.opensearch_client import get_client
-from searchapp.index import index_name
+from searchapp.views.index import index_name
 
 
 class Command(BaseCommand):
