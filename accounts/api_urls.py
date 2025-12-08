@@ -14,7 +14,9 @@ from .views import (
     RegisterView,
     ResetPasswordView,
     TelegramLoginView,
+    TelegramWebhookView,
     UserProfileView,
+    TelegramChatConfigViewSet,
 )
 
 urlpatterns = [
@@ -32,6 +34,12 @@ urlpatterns = [
 
     # Token refresh
     path("auth/refresh", TokenRefreshView.as_view(), name="auth-refresh"),
+
+    # Telegram webhook (public endpoint - no authentication)
+    path("webhooks/telegram", TelegramWebhookView.as_view(), name="webhook-telegram"),
+    
+    # Telegram chat management
+    path("telegram-chats/", TelegramChatConfigViewSet.as_view({"get": "list"}), name="telegram-chats"),
 
     # Profile endpoints
     path("me", MeView.as_view(), name="me"),

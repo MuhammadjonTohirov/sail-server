@@ -178,6 +178,10 @@ SPECTACULAR_SETTINGS = {
 # Telegram integration (login + bot usage)
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8314735056:AAEQSsb7cgR-VR4U6rPZ8z_pHLUViH2asc8")
 TELEGRAM_LOGIN_MAX_AGE = int(os.environ.get("TELEGRAM_LOGIN_MAX_AGE", "86400"))  # seconds (default 1 day)
+TELEGRAM_WEBHOOK_SECRET_TOKEN = os.environ.get("TELEGRAM_WEBHOOK_SECRET_TOKEN", "")
+WEB_BASE_URL = os.environ.get("WEB_BASE_URL", "https://sail.uz")
+# If empty, webhook accepts all requests (less secure but simpler for dev)
+# In production, generate random token: openssl rand -hex 32
 
 # Logging (basic)
 LOGGING = {

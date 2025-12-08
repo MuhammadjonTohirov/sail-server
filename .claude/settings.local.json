@@ -4,7 +4,10 @@
       "Bash(./scripts/opensearch_up.sh:*)",
       "Read(//Users/r/Documents/Development/Personal/Startups/olx_clone/**)",
       "Bash(source:*)",
-      "Bash(python manage.py migrate:*)"
+      "Bash(python manage.py migrate:*)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

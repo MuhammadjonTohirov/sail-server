@@ -31,6 +31,24 @@ class SavedSearchDetailView(generics.RetrieveUpdateDestroyAPIView):
         return SavedSearch.objects.filter(user=self.request.user)
 
 
+class SavedSearchMarkViewedView(APIView):
+    """Mark a saved search as viewed (updates last_viewed_at)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk: int):
+        from django.utils import timezone
+
+        try:
+            saved = SavedSearch.objects.get(id=pk, user=request.user)
+        except SavedSearch.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+
+        saved.last_viewed_at = timezone.now()
+        saved.save(update_fields=["last_viewed_at"])
+
+        return Response({"success": True, "last_viewed_at": saved.last_viewed_at})
+
+
 class SavedSearchRunNowView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

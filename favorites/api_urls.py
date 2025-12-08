@@ -7,6 +7,7 @@ from .views import (
     RecentlyViewedListingListView,
     RecentlyViewedListingTrackView,
     RecentlyViewedListingClearView,
+    SuggestedListingsView,
 )
 
 urlpatterns = [
@@ -19,4 +20,7 @@ urlpatterns = [
     path("recently-viewed", RecentlyViewedListingListView.as_view(), name="recently-viewed-list"),
     path("recently-viewed/<int:listing_id>", RecentlyViewedListingTrackView.as_view(), name="recently-viewed-track"),
     path("recently-viewed/clear", RecentlyViewedListingClearView.as_view(), name="recently-viewed-clear"),
+
+    # Suggested/Recommended Listings
+    path("suggested-listings", SuggestedListingsView.as_view(), name="suggested-listings"),
 ]

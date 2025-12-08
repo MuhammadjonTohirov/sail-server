@@ -253,6 +253,10 @@ class ListingAttributeInputSerializer(serializers.Serializer):
 
 class ListingCreateSerializer(serializers.ModelSerializer):
     attributes = ListingAttributeInputSerializer(many=True, required=False)
+    sharing_telegram_chat_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, write_only=True
+    )
+
     class Meta:
         model = Listing
         fields = [
@@ -273,12 +277,34 @@ class ListingCreateSerializer(serializers.ModelSerializer):
             "contact_email",
             "contact_phone",
             "attributes",
+            "sharing_telegram_chat_ids",
         ]
         read_only_fields = ["id"]
+
+    def validate_sharing_telegram_chat_ids(self, value):
+        """Validate that the user owns these chat configs and they are active."""
+        user = self.context["request"].user
+        if not value:
+            return value
+
+        from accounts.models import TelegramChatConfig
+
+        # Check if all chat_ids exist for this user and are active
+        valid_chats = TelegramChatConfig.objects.filter(
+            profile__user=user, chat_id__in=value, is_active=True
+        ).values_list("chat_id", flat=True)
+
+        invalid_ids = set(value) - set(valid_chats)
+        if invalid_ids:
+            raise serializers.ValidationError(
+                f"Invalid or inactive Telegram chat IDs: {list(invalid_ids)}"
+            )
+        return value
 
     def create(self, validated_data):
         user = self.context["request"].user
         attrs_payload = validated_data.pop("attributes", [])
+        telegram_chat_ids = validated_data.pop("sharing_telegram_chat_ids", [])
 
         # Set default contact info from user profile if not provided
         if hasattr(user, "profile"):
@@ -301,6 +327,10 @@ class ListingCreateSerializer(serializers.ModelSerializer):
         listing.save(update_fields=["contact_phone_masked"])
         if attrs_payload:
             self._save_attributes(listing, attrs_payload)
+        
+        # Store telegram_chat_ids on the instance for the view to access
+        listing._sharing_telegram_chat_ids = telegram_chat_ids
+        
         return listing
 
     def _save_attributes(self, listing: Listing, attrs_payload: List[Dict[str, Any]]):

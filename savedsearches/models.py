@@ -15,6 +15,7 @@ class SavedSearch(models.Model):
     frequency = models.CharField(max_length=16, choices=Frequency.choices, default=Frequency.DAILY)
     is_active = models.BooleanField(default=True)
     last_sent_at = models.DateTimeField(null=True, blank=True)
+    last_viewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

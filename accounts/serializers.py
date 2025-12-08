@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
+from . import models
 from .models import Profile
 
 
@@ -111,3 +112,30 @@ class TelegramLoginSerializer(serializers.Serializer):
     photo_url = serializers.URLField(required=False, allow_blank=True)
     auth_date = serializers.IntegerField()
     hash = serializers.CharField()
+
+
+class TelegramChatConfigSerializer(serializers.ModelSerializer):
+    """Serializer for reading Telegram chat configurations."""
+    chat_photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.TelegramChatConfig
+        fields = [
+            "id",
+            "chat_id",
+            "chat_type",
+            "chat_title",
+            "chat_username",
+            "chat_photo",
+            "is_active",
+            "bot_status",
+            "created_at",
+            "updated_at",
+            "last_verified_at",
+        ]
+        read_only_fields = fields  # All fields are read-only (webhook-managed)
+
+    def get_chat_photo(self, obj):
+        if obj.chat_photo:
+            return obj.chat_photo.url
+        return None

@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/.c2a8e12ef2c44b612650dbcbd5354bef3f489d87-audit.json",
+    "files": [
+        {
+            "date": 1765041990541,
+            "name": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/mcp-puppeteer-2025-12-06.log",
+            "hash": "4996386e07a44c04fadddd82766367598c76634838d59dab2707a134ef13dd67"
+        },
+        {
+            "date": 1765099517522,
+            "name": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/mcp-puppeteer-2025-12-07.log",
+            "hash": "c0f5e058e36721e535241c50ae7c4f9113f5b9625cc2525b162747de6440f2dd"
+        }
+    ],
+    "hashType": "sha256"
+}

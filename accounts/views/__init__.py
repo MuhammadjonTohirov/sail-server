@@ -24,6 +24,12 @@ from .profile import (
 # Telegram authentication
 from .telegram_auth import TelegramLoginView
 
+# Telegram webhook
+from .telegram_webhook import TelegramWebhookView
+
+# Telegram chat management
+from .telegram_chat_config import TelegramChatConfigViewSet
+
 __all__ = [
     # OTP
     "OTPRequestView",
@@ -36,6 +42,8 @@ __all__ = [
     "ResetPasswordView",
     # Telegram
     "TelegramLoginView",
+    "TelegramWebhookView",
+    "TelegramChatConfigViewSet",
     # Profile
     "MeView",
     "ProfileUpdateView",

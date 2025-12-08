@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from listings.models import Listing
+from listings.serializers import ListingSerializer
 from .models import FavoriteListing, RecentlyViewedListing
 from .serializers import FavoriteListingSerializer, RecentlyViewedListingSerializer
 
@@ -180,3 +181,97 @@ class RecentlyViewedListingClearView(APIView):
                 count = 0
 
         return Response({"deleted": count}, status=status.HTTP_200_OK)
+
+
+class SuggestedListingsView(APIView):
+    """
+    GET /api/v1/suggested-listings
+
+    Returns suggested/recommended listings based on user's recently viewed items.
+
+    Algorithm:
+    1. Get categories from user's recently viewed listings
+    2. Find active listings in those categories
+    3. Exclude listings the user has already viewed
+    4. Return up to 12 listings, ordered by freshness
+
+    For anonymous users, uses session-based recently viewed history.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        limit = int(request.query_params.get('limit', 12))
+
+        # Get user's recently viewed categories
+        if request.user.is_authenticated:
+            recent_views = RecentlyViewedListing.objects.filter(
+                user=request.user
+            ).select_related('listing__category')[:10]
+        else:
+            session_key = request.session.session_key
+            if not session_key:
+                # No session, return newest listings
+                return self._get_default_suggestions(limit)
+
+            recent_views = RecentlyViewedListing.objects.filter(
+                session_key=session_key
+            ).select_related('listing__category')[:10]
+
+        if not recent_views.exists():
+            # No viewing history, return newest listings
+            return self._get_default_suggestions(limit)
+
+        # Extract category IDs from recently viewed listings
+        category_ids = list(set([
+            rv.listing.category_id
+            for rv in recent_views
+            if rv.listing and rv.listing.category_id
+        ]))
+
+        if not category_ids:
+            return self._get_default_suggestions(limit)
+
+        # Get IDs of listings already viewed by user
+        viewed_listing_ids = list(recent_views.values_list('listing_id', flat=True))
+
+        # Find suggested listings:
+        # - In the same categories as recently viewed
+        # - Exclude already viewed listings
+        # - Only active listings
+        # - Order by most recent first
+        suggested_listings = Listing.objects.filter(
+            category_id__in=category_ids,
+            status=Listing.Status.ACTIVE
+        ).exclude(
+            id__in=viewed_listing_ids
+        ).select_related(
+            'category', 'location', 'user'
+        ).prefetch_related(
+            'media'
+        ).order_by('-refreshed_at', '-created_at')[:limit]
+
+        serializer = ListingSerializer(suggested_listings, many=True, context={'request': request})
+
+        return Response({
+            'results': serializer.data,
+            'count': len(serializer.data),
+            'based_on_categories': category_ids,
+        }, status=status.HTTP_200_OK)
+
+    def _get_default_suggestions(self, limit):
+        """Return newest active listings when no viewing history exists."""
+        default_listings = Listing.objects.filter(
+            status=Listing.Status.ACTIVE
+        ).select_related(
+            'category', 'location', 'user'
+        ).prefetch_related(
+            'media'
+        ).order_by('-refreshed_at', '-created_at')[:limit]
+
+        serializer = ListingSerializer(default_listings, many=True, context={'request': self.request})
+
+        return Response({
+            'results': serializer.data,
+            'count': len(serializer.data),
+            'based_on_categories': [],
+        }, status=status.HTTP_200_OK)

@@ -139,7 +139,7 @@ class TelegramLoginView(APIView):
                     photo_file = download_telegram_photo(photo_url, telegram_id) if photo_url else None
 
                     profile_defaults = {
-                        "phone_e164": f"tg:{telegram_id}",
+                        "phone_e164": None,
                         "display_name": full_name or username or user_username,
                         "telegram_id": telegram_id,
                         "telegram_username": username,

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import OtpCode, Profile
+from .models import OtpCode, Profile, TelegramChatConfig
 
 
 @admin.register(Profile)
@@ -15,3 +15,7 @@ class OtpCodeAdmin(admin.ModelAdmin):
     list_filter = ("used",)
     search_fields = ("phone_e164",)
 
+
+@admin.register(TelegramChatConfig)
+class TelegramChatConfigAdmin(admin.ModelAdmin):
+    list_display = ("chat_id", "chat_type", "is_active", "created_at")
