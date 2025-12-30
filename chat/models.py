@@ -13,6 +13,11 @@ class ChatThread(models.Model):
         ARCHIVED = "archived", "Archived"
         CLOSED = "closed", "Closed"
 
+    class ListingAvailability(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        UNAVAILABLE = "unavailable", "Unavailable"
+        DELETED = "deleted", "Deleted"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     buyer_id = models.BigIntegerField()
     seller_id = models.BigIntegerField()
@@ -21,6 +26,13 @@ class ChatThread(models.Model):
     listing_price_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     listing_price_currency = models.CharField(max_length=3, blank=True, default="")
     listing_thumbnail_url = models.URLField(blank=True, default="")
+    listing_availability = models.CharField(
+        max_length=16,
+        choices=ListingAvailability.choices,
+        default=ListingAvailability.AVAILABLE,
+        help_text="Cached availability status of the listing"
+    )
+    listing_availability_checked_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     last_message_at = models.DateTimeField(null=True, blank=True)
     last_message_preview = models.CharField(max_length=400, blank=True, default="")
@@ -44,6 +56,12 @@ class ChatThread(models.Model):
         self.last_message_at = at or timezone.now()
         self.last_message_preview = preview[:400]
         self.save(update_fields=["last_message_at", "last_message_preview", "updated_at"])
+
+    def update_listing_availability(self, availability: str) -> None:
+        """Update the cached listing availability status."""
+        self.listing_availability = availability
+        self.listing_availability_checked_at = timezone.now()
+        self.save(update_fields=["listing_availability", "listing_availability_checked_at", "updated_at"])
 
 
 class ChatThreadParticipant(models.Model):

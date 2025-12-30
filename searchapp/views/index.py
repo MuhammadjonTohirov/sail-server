@@ -59,6 +59,8 @@ def mapping_body() -> Dict[str, Any]:
                     },
                 },
                 "media_urls": {"type": "keyword"},
+                "seller_id": {"type": "keyword"},
+                "seller_name": {"type": "keyword"},
             },
         },
     }
@@ -122,6 +124,15 @@ def build_document(listing: Listing) -> Dict[str, Any]:
         CurrencyService.normalize_price_to_base(listing.price_amount or 0, listing.price_currency)
     )
 
+    # Seller info from profile
+    from accounts.models import Profile
+    seller_name = ""
+    try:
+        profile = Profile.objects.get(user_id=listing.user_id)
+        seller_name = profile.display_name or ""
+    except Profile.DoesNotExist:
+        pass
+
     doc = {
         "id": str(listing.id),
         "user_id": str(listing.user_id),
@@ -140,6 +151,8 @@ def build_document(listing: Listing) -> Dict[str, Any]:
         "quality_score": listing.quality_score,
         "attrs": attrs,
         "media_urls": media_urls,
+        "seller_id": str(listing.user_id),
+        "seller_name": seller_name,
     }
     return doc
 

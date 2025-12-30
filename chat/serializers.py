@@ -103,6 +103,8 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             "price_amount": obj.listing_price_amount,
             "price_currency": obj.listing_price_currency,
             "thumbnail_url": obj.listing_thumbnail_url,
+            "availability": obj.listing_availability,
+            "availability_checked_at": obj.listing_availability_checked_at,
         }
 
     def get_other_participant(self, obj: ChatThread) -> dict[str, Any] | None:

@@ -58,6 +58,9 @@ class ProfileSerializer(serializers.ModelSerializer):
             "telegram_id",
             "telegram_username",
             "telegram_photo_url",
+            "notify_new_messages",
+            "notify_saved_searches",
+            "notify_promotions",
             "last_active_at",
             "created_at",
         ]
@@ -80,7 +83,16 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ["display_name", "email", "location", "logo", "banner"]
+        fields = [
+            "display_name",
+            "email",
+            "location",
+            "logo",
+            "banner",
+            "notify_new_messages",
+            "notify_saved_searches",
+            "notify_promotions",
+        ]
 
     def update(self, instance, validated_data):
         # Handle location separately

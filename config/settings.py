@@ -167,6 +167,16 @@ OPENSEARCH_INDEX_VERSION = int(os.environ.get("OPENSEARCH_INDEX_VERSION", "2"))
 CELERY_TASK_SOFT_TIME_LIMIT = int(os.environ.get("CELERY_TASK_SOFT_TIME_LIMIT", "30"))
 CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "60"))
 
+# Celery Beat schedule for periodic tasks
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    "daily-saved-search-notifications": {
+        "task": "savedsearches.run_daily_notifications",
+        "schedule": crontab(hour=9, minute=0),  # Run daily at 9:00 AM
+        "options": {"expires": 3600},  # Expire after 1 hour if not picked up
+    },
+}
+
 # SimpleJWT defaults can be overridden via env later if needed
 # drf-spectacular
 SPECTACULAR_SETTINGS = {

@@ -2,7 +2,10 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
+    AccountSecurityInfoView,
+    ChangePasswordView,
     ForgotPasswordView,
+    LinkTelegramView,
     LoginView,
     MeView,
     OTPRequestView,
@@ -13,10 +16,12 @@ from .views import (
     RegisterVerifyView,
     RegisterView,
     ResetPasswordView,
+    SetPasswordView,
+    TelegramChatConfigViewSet,
     TelegramLoginView,
     TelegramWebhookView,
+    UnlinkTelegramView,
     UserProfileView,
-    TelegramChatConfigViewSet,
 )
 
 urlpatterns = [
@@ -40,6 +45,10 @@ urlpatterns = [
     
     # Telegram chat management
     path("telegram-chats/", TelegramChatConfigViewSet.as_view({"get": "list"}), name="telegram-chats"),
+    path("telegram-chats/<int:id>/", TelegramChatConfigViewSet.as_view({"get": "retrieve", "delete": "destroy"}), name="telegram-chat-detail"),
+    path("telegram-chats/<int:id>/disconnect/", TelegramChatConfigViewSet.as_view({"post": "destroy"}), name="telegram-chat-disconnect"),
+    path("telegram-chats/disconnect-all/", TelegramChatConfigViewSet.as_view({"post": "disconnect_all"}), name="telegram-chats-disconnect-all"),
+    path("telegram-chats/stats/", TelegramChatConfigViewSet.as_view({"get": "stats"}), name="telegram-chats-stats"),
 
     # Profile endpoints
     path("me", MeView.as_view(), name="me"),
@@ -47,4 +56,11 @@ urlpatterns = [
     path("profile/active", ProfileActiveView.as_view(), name="profile-active"),
     path("profile/delete", ProfileDeleteView.as_view(), name="profile-delete"),
     path("users/<int:user_id>", UserProfileView.as_view(), name="user-profile"),
+
+    # Security endpoints
+    path("security", AccountSecurityInfoView.as_view(), name="security-info"),
+    path("security/change-password", ChangePasswordView.as_view(), name="security-change-password"),
+    path("security/set-password", SetPasswordView.as_view(), name="security-set-password"),
+    path("security/link-telegram", LinkTelegramView.as_view(), name="security-link-telegram"),
+    path("security/unlink-telegram", UnlinkTelegramView.as_view(), name="security-unlink-telegram"),
 ]

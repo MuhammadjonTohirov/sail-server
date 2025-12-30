@@ -12,6 +12,8 @@ from .listing_update_raw_view import ListingUpdateRawView
 from .listing_deactivate_view import ListingDeactivateView
 from .listing_activate_view import ListingActivateView
 from .listing_delete_view import ListingDeleteView
+from .listing_share_view import ListingShareView
+from .listing_interest_view import ListingInterestView
 
 __all__ = [
     "ListingCreateView",
@@ -28,4 +30,6 @@ __all__ = [
     "ListingDeactivateView",
     "ListingActivateView",
     "ListingDeleteView",
+    "ListingShareView",
+    "ListingInterestView",
 ]

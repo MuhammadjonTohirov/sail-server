@@ -30,6 +30,15 @@ from .telegram_webhook import TelegramWebhookView
 # Telegram chat management
 from .telegram_chat_config import TelegramChatConfigViewSet
 
+# Security (password change, account linking)
+from .security import (
+    AccountSecurityInfoView,
+    ChangePasswordView,
+    LinkTelegramView,
+    SetPasswordView,
+    UnlinkTelegramView,
+)
+
 __all__ = [
     # OTP
     "OTPRequestView",
@@ -50,4 +59,10 @@ __all__ = [
     "ProfileDeleteView",
     "ProfileActiveView",
     "UserProfileView",
+    # Security
+    "AccountSecurityInfoView",
+    "ChangePasswordView",
+    "LinkTelegramView",
+    "SetPasswordView",
+    "UnlinkTelegramView",
 ]

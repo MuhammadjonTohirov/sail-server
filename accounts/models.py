@@ -37,6 +37,11 @@ class Profile(models.Model):
     telegram_username = models.CharField(max_length=255, blank=True, default="")
     telegram_photo_url = models.URLField(blank=True, default="")
 
+    # Notification preferences
+    notify_new_messages = models.BooleanField(default=True, help_text="Notify about new chat messages")
+    notify_saved_searches = models.BooleanField(default=True, help_text="Notify about new items in saved searches")
+    notify_promotions = models.BooleanField(default=False, help_text="Notify about promotions and offers")
+
     last_active_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

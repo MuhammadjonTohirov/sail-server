@@ -109,6 +109,9 @@ class RecentlyViewedListingTrackView(APIView):
     """
     POST /api/v1/recently-viewed/<listing_id>
     Track that a user viewed a listing.
+
+    For anonymous users, uses X-Client-Session-Id header to identify the browser.
+    This is necessary because credentials: 'omit' prevents cookie-based sessions.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -138,15 +141,24 @@ class RecentlyViewedListingTrackView(APIView):
                         defaults={"session_key": None}
                     )
                 else:
-                    # For anonymous users, use session
-                    if not request.session.session_key:
-                        request.session.create()
+                    # For anonymous users, use client-provided session ID
+                    # This is needed because credentials: 'omit' prevents cookie sessions
+                    client_session_id = request.headers.get('X-Client-Session-Id', '')
+
+                    if not client_session_id:
+                        # No session ID provided, just return OK without tracking
+                        return Response({"tracked": False}, status=status.HTTP_200_OK)
 
                     obj, created = RecentlyViewedListing.objects.update_or_create(
-                        session_key=request.session.session_key,
+                        session_key=client_session_id,
                         listing=listing,
                         defaults={"user": None}
                     )
+
+                # Increment view count only for new views
+                if created:
+                    from django.db.models import F
+                    Listing.objects.filter(id=listing_id).update(view_count=F('view_count') + 1)
 
                 return Response(
                     {"tracked": True},

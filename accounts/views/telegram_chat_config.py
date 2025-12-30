@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import logging
 
+import requests
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,6 +15,41 @@ from ..serializers import TelegramChatConfigSerializer
 
 
 logger = logging.getLogger(__name__)
+
+
+def verify_bot_in_chat(chat_id: int) -> tuple[bool, str]:
+    """
+    Check if the bot is still a member/admin in the specified chat.
+    Returns (is_active, status_string)
+    """
+    bot_token = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
+    if not bot_token:
+        return True, "unknown"  # Can't verify without token, assume active
+
+    try:
+        # Get chat member info for the bot itself
+        resp = requests.get(
+            f"https://api.telegram.org/bot{bot_token}/getChatMember",
+            params={"chat_id": chat_id, "user_id": bot_token.split(":")[0]},
+            timeout=10,
+        )
+
+        if not resp.ok:
+            # If 400/403, bot was likely kicked or chat was deleted
+            return False, "kicked"
+
+        data = resp.json()
+        if not data.get("ok"):
+            return False, "error"
+
+        member_status = data.get("result", {}).get("status", "unknown")
+        # Valid statuses: creator, administrator, member, restricted, left, kicked
+        is_active = member_status in ("creator", "administrator", "member")
+        return is_active, member_status
+
+    except requests.RequestException as e:
+        logger.error(f"Error verifying bot in chat {chat_id}: {e}")
+        return True, "error"  # Assume active on network error
 
 
 class TelegramChatConfigViewSet(
@@ -100,3 +138,32 @@ class TelegramChatConfigViewSet(
         }
 
         return Response(stats)
+
+    @action(detail=False, methods=["post"], url_path="verify")
+    def verify(self, request):
+        """
+        Verify all connected chats and update their status.
+
+        Checks with Telegram API if the bot is still active in each chat,
+        and updates the is_active and bot_status fields accordingly.
+        """
+        queryset = self.get_queryset()
+        results = {"verified": 0, "deactivated": 0, "errors": 0}
+
+        for chat_config in queryset:
+            try:
+                is_active, bot_status = verify_bot_in_chat(chat_config.chat_id)
+                chat_config.bot_status = bot_status
+                chat_config.is_active = is_active
+                chat_config.last_verified_at = timezone.now()
+                chat_config.save(update_fields=["bot_status", "is_active", "last_verified_at", "updated_at"])
+
+                results["verified"] += 1
+                if not is_active:
+                    results["deactivated"] += 1
+
+            except Exception as e:
+                logger.error(f"Error verifying chat {chat_config.chat_id}: {e}")
+                results["errors"] += 1
+
+        return Response(results)

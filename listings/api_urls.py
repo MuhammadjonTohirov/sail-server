@@ -7,6 +7,7 @@ from .views import (
     ListingDeactivateView,
     ListingDeleteView,
     ListingDetailView,
+    ListingInterestView,
     ListingMediaDeleteView,
     ListingMediaReorderView,
     ListingMediaUploadView,
@@ -15,6 +16,7 @@ from .views import (
     ListingUpdateRawView,
     MyListingsView,
     UserListingsView,
+    ListingShareView,
 )
 
 urlpatterns = [
@@ -27,6 +29,8 @@ urlpatterns = [
     path("listings/<int:pk>/deactivate", ListingDeactivateView.as_view(), name="listing-deactivate"),
     path("listings/<int:pk>/activate", ListingActivateView.as_view(), name="listing-activate"),
     path("listings/<int:pk>/delete", ListingDeleteView.as_view(), name="listing-delete"),
+    path("listings/<int:pk>/share", ListingShareView.as_view(), name="listing-share"),
+    path("listings/<int:pk>/interest", ListingInterestView.as_view(), name="listing-interest"),
     path("listings/<int:pk>/media", ListingMediaUploadView.as_view(), name="listing-media-upload"),
     path("listings/<int:pk>/media/<int:media_id>", ListingMediaDeleteView.as_view(), name="listing-media-delete"),
     path("listings/<int:pk>/media/reorder", ListingMediaReorderView.as_view(), name="listing-media-reorder"),

@@ -8,7 +8,7 @@ from typing import Any, Dict
 from django.core.management.base import BaseCommand
 from django.conf import settings
 
-from searchapp.opensearch_client import get_client
+from searchapp.views.opensearch_client import get_client
 from searchapp.views.index import index_name
 
 

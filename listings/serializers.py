@@ -19,9 +19,9 @@ class ListingMediaSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "image_url", "uploaded_at"]
 
     def get_image_url(self, obj):  # pragma: no cover
-        request = self.context.get("request")
-        if request:
-            return obj.image.url#request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+    def get_image(self, obj):
         return obj.image.url
 
 
@@ -34,6 +34,7 @@ class ListingSerializer(serializers.ModelSerializer):
     location_slug = serializers.SerializerMethodField()
     seller = serializers.SerializerMethodField()
     price_normalized = serializers.SerializerMethodField()
+    favorite_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -68,6 +69,9 @@ class ListingSerializer(serializers.ModelSerializer):
             "attributes",
             "seller",
             "price_normalized",
+            "view_count",
+            "favorite_count",
+            "interest_count",
         ]
         read_only_fields = [
             "status",
@@ -77,6 +81,9 @@ class ListingSerializer(serializers.ModelSerializer):
             "quality_score",
             "contact_phone_masked",
             "price_normalized",
+            "view_count",
+            "favorite_count",
+            "interest_count",
         ]
 
     def get_attributes(self, obj: Listing) -> List[Dict[str, Any]]:  # pragma: no cover
@@ -188,6 +195,10 @@ class ListingSerializer(serializers.ModelSerializer):
         )
         return float(normalized)
 
+    def get_favorite_count(self, obj: Listing) -> int:  # pragma: no cover
+        """Return the number of users who favorited this listing"""
+        return obj.favorited_by.count()
+
 
 class ListingAttributeInputSerializer(serializers.Serializer):
     attribute = serializers.JSONField()  # accept id or key; validate handles coercion
@@ -253,9 +264,6 @@ class ListingAttributeInputSerializer(serializers.Serializer):
 
 class ListingCreateSerializer(serializers.ModelSerializer):
     attributes = ListingAttributeInputSerializer(many=True, required=False)
-    sharing_telegram_chat_ids = serializers.ListField(
-        child=serializers.IntegerField(), required=False, write_only=True
-    )
 
     class Meta:
         model = Listing
@@ -277,34 +285,12 @@ class ListingCreateSerializer(serializers.ModelSerializer):
             "contact_email",
             "contact_phone",
             "attributes",
-            "sharing_telegram_chat_ids",
         ]
         read_only_fields = ["id"]
-
-    def validate_sharing_telegram_chat_ids(self, value):
-        """Validate that the user owns these chat configs and they are active."""
-        user = self.context["request"].user
-        if not value:
-            return value
-
-        from accounts.models import TelegramChatConfig
-
-        # Check if all chat_ids exist for this user and are active
-        valid_chats = TelegramChatConfig.objects.filter(
-            profile__user=user, chat_id__in=value, is_active=True
-        ).values_list("chat_id", flat=True)
-
-        invalid_ids = set(value) - set(valid_chats)
-        if invalid_ids:
-            raise serializers.ValidationError(
-                f"Invalid or inactive Telegram chat IDs: {list(invalid_ids)}"
-            )
-        return value
 
     def create(self, validated_data):
         user = self.context["request"].user
         attrs_payload = validated_data.pop("attributes", [])
-        telegram_chat_ids = validated_data.pop("sharing_telegram_chat_ids", [])
 
         # Set default contact info from user profile if not provided
         if hasattr(user, "profile"):
@@ -327,9 +313,6 @@ class ListingCreateSerializer(serializers.ModelSerializer):
         listing.save(update_fields=["contact_phone_masked"])
         if attrs_payload:
             self._save_attributes(listing, attrs_payload)
-        
-        # Store telegram_chat_ids on the instance for the view to access
-        listing._sharing_telegram_chat_ids = telegram_chat_ids
         
         return listing
 

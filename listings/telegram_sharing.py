@@ -1,5 +1,6 @@
 import logging
 import requests
+import html
 from django.conf import settings
 from django.urls import reverse
 from .models import Listing
@@ -13,7 +14,7 @@ class TelegramSharingService:
         Share a listing to multiple Telegram chats.
         """
         try:
-            listing = Listing.objects.select_related("category", "location", "currency").get(id=listing_id)
+            listing = Listing.objects.select_related("category", "location").get(id=listing_id)
         except Listing.DoesNotExist:
             logger.error(f"Listing {listing_id} not found for Telegram sharing")
             return
@@ -28,7 +29,7 @@ class TelegramSharingService:
         frontend_url = settings.WEB_BASE_URL.rstrip("/") if hasattr(settings, "WEB_BASE_URL") else "https://sail.uz"
         listing_url = f"{frontend_url}/l/{listing.id}"
         
-        price_text = f"{listing.price_amount:, .0f} {listing.price_currency}" if listing.price_amount else "Договорная"
+        price_text = f"{listing.price_amount:,.0f}".replace(",", " ") + f" {listing.price_currency}" if listing.price_amount else "Договорная"
         
         # Hashtags from category hierarchy
         hashtags = []
@@ -39,17 +40,22 @@ class TelegramSharingService:
             cat = cat.parent
         hashtags_str = " ".join(hashtags)
 
+        # Escape HTML content to prevent parse errors
+        title_safe = html.escape(listing.title)
+        desc_safe = html.escape(listing.description[:200])
+        location_safe = html.escape(listing.location.name if listing.location else 'Uzbekistan')
+
         caption = (
-            f"<b>{listing.title}</b>\n\n"
+            f"<b>{title_safe}</b>\n\n"
             f"💰 {price_text}\n"
-            f"📍 {listing.location.name if listing.location else 'Uzbekistan'}\n\n"
-            f"{listing.description[:200]}{'...' if len(listing.description) > 200 else ''}\n\n"
+            f"📍 {location_safe}\n\n"
+            f"{desc_safe}{'...' if len(listing.description) > 200 else ''}\n\n"
             f"{hashtags_str}\n\n"
             f"👉 <a href='{listing_url}'>Посмотреть объявление</a>"
         )
 
         # Get first image if available
-        first_image = listing.media.filter(type="image").order_by("order").first()
+        first_image = listing.media.filter(type="photo").order_by("order").first()
         
         for chat_id in chat_ids:
             try:
