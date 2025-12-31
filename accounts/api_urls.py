@@ -38,7 +38,7 @@ urlpatterns = [
     path("auth/telegram", TelegramLoginView.as_view(), name="auth-telegram"),
 
     # Token refresh
-    path("auth/refresh", TokenRefreshView.as_view(), name="auth-refresh"),
+    path("auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
 
     # Telegram webhook (public endpoint - no authentication)
     path("webhooks/telegram", TelegramWebhookView.as_view(), name="webhook-telegram"),
@@ -49,6 +49,7 @@ urlpatterns = [
     path("telegram-chats/<int:id>/disconnect/", TelegramChatConfigViewSet.as_view({"post": "destroy"}), name="telegram-chat-disconnect"),
     path("telegram-chats/disconnect-all/", TelegramChatConfigViewSet.as_view({"post": "disconnect_all"}), name="telegram-chats-disconnect-all"),
     path("telegram-chats/stats/", TelegramChatConfigViewSet.as_view({"get": "stats"}), name="telegram-chats-stats"),
+    path("telegram-chats/verify/", TelegramChatConfigViewSet.as_view({"post": "verify"}), name="telegram-chats-verify"),
 
     # Profile endpoints
     path("me", MeView.as_view(), name="me"),
