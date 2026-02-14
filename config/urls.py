@@ -16,7 +16,7 @@ urlpatterns = [
     path("api/v1/", include("searchapp.api_urls")),
     path("api/v1/", include("savedsearches.api_urls")),
     path("api/v1/", include("favorites.api_urls")),
-    path("api/v1/", include("uploads.api_urls")),
+    # path("api/v1/", include("uploads.api_urls")),
     path("api/v1/", include("moderation.api_urls")),
     path("api/v1/", include("chat.api_urls")),
     path("api/v1/", include("currency.api_urls")),

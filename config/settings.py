@@ -36,7 +36,7 @@ INSTALLED_APPS = [
     "searchapp",
     "savedsearches",
     "favorites",
-    "uploads",
+    # "uploads",
     "moderation",
     "chat",
     "currency",
@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # WhiteNoise qo'shildi
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -120,8 +121,14 @@ TIME_ZONE = os.environ.get("TIME_ZONE", "Asia/Tashkent")
 USE_I18N = True
 USE_TZ = True
 
+# Static files - WhiteNoise sozlamalari
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise static files storage
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -133,6 +140,15 @@ if DEBUG:
 else:
     origins = [o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o]
     CORS_ALLOWED_ORIGINS = origins
+    
+    # CSRF trusted origins for production
+    CSRF_TRUSTED_ORIGINS = origins.copy()
+    # Add .onrender.com wildcard if not in origins
+    if not any('.onrender.com' in o for o in origins):
+        CSRF_TRUSTED_ORIGINS.append('https://*.onrender.com')
+
+# CORS credentials
+CORS_ALLOW_CREDENTIALS = True
 
 # DRF basics
 REST_FRAMEWORK = {
@@ -180,7 +196,7 @@ CELERY_BEAT_SCHEDULE = {
 # SimpleJWT defaults can be overridden via env later if needed
 # drf-spectacular
 SPECTACULAR_SETTINGS = {
-    "TITLE": "OLX Clone API",
+    "TITLE": "Sail API",
     "DESCRIPTION": "Classifieds platform API",
     "VERSION": "1.0.0",
 }
@@ -218,3 +234,15 @@ if not _chat_attachment_prefixes:
     if media_url.startswith(("http://", "https://")):
         _chat_attachment_prefixes.append(media_url)
 CHAT_ATTACHMENT_ALLOWED_URL_PREFIXES = _chat_attachment_prefixes
+
+# Security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
