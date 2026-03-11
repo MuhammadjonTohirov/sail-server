@@ -1,0 +1,40 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/.ba62bc37e9b32da8c333ad3310014f1b673cc66b-audit.json",
+    "files": [
+        {
+            "date": 1771610630378,
+            "name": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/mcp-puppeteer-2026-02-20.log",
+            "hash": "a3af39e48ddd30505b16a0d6216c54ba061ad0f2d3d046da9b432d274baf36fd"
+        },
+        {
+            "date": 1771873146767,
+            "name": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/mcp-puppeteer-2026-02-23.log",
+            "hash": "4f43c27ceaa477f2116d4c37d6f8de626178182df2c629f7ae7e5b6acf15abe7"
+        },
+        {
+            "date": 1772356993999,
+            "name": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/mcp-puppeteer-2026-03-01.log",
+            "hash": "8e8a6ddcc5ff068cbabef5084a58b8f94b895c048bbbab00eedeffb921a1f554"
+        },
+        {
+            "date": 1772431502225,
+            "name": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/mcp-puppeteer-2026-03-02.log",
+            "hash": "af84edb959622d504f04b68b7afd90b366f12cf28d2cd58c8373021f6b3aca5f"
+        },
+        {
+            "date": 1772724307836,
+            "name": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/mcp-puppeteer-2026-03-05.log",
+            "hash": "c0922562058620ae30f0278d139e18fd0a87bdd7a1a6494ab8bea7562d8dfd1e"
+        },
+        {
+            "date": 1772761987178,
+            "name": "/Volumes/Lexar/Documents/Development/sailuz/sail-server/logs/mcp-puppeteer-2026-03-06.log",
+            "hash": "c715f717d4c8a62c1d5831cbf05a95aba2527041308ce65aba1c2db9e5f6aee4"
+        }
+    ],
+    "hashType": "sha256"
+}
