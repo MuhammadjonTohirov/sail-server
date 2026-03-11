@@ -9,13 +9,20 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Security: Default DEBUG to False for safety
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() in {"1", "true", "yes"}
+
+# Security: Require SECRET_KEY in production
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in {"1", "true", "yes"}
+if not DEBUG and SECRET_KEY == "dev-secret-key-change-me":
+    raise ValueError("DJANGO_SECRET_KEY must be set in production!")
 
 if DEBUG:
     ALLOWED_HOSTS = ["*"]
 else:
-    ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h] or []
+    ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
+    if not ALLOWED_HOSTS:
+        raise ValueError("DJANGO_ALLOWED_HOSTS must be set in production!")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -139,6 +146,8 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     origins = [o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o]
+    if not origins:
+        raise ValueError("CORS_ALLOWED_ORIGINS must be set in production!")
     CORS_ALLOWED_ORIGINS = origins
     
     # CSRF trusted origins for production
@@ -150,33 +159,58 @@ else:
 # CORS credentials
 CORS_ALLOW_CREDENTIALS = True
 
+# Security headers for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "True").lower() in {"1", "true", "yes"}
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    X_FRAME_OPTIONS = "DENY"
+
 # DRF basics
+_drf_auth_classes = [
+    "rest_framework_simplejwt.authentication.JWTAuthentication",
+    "rest_framework.authentication.SessionAuthentication",
+]
+# Only enable BasicAuth in DEBUG mode
+if DEBUG:
+    _drf_auth_classes.append("rest_framework.authentication.BasicAuthentication")
+
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
-    ),
+    "DEFAULT_AUTHENTICATION_CLASSES": tuple(_drf_auth_classes),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # Throttling disabled for development
-    # "DEFAULT_THROTTLE_CLASSES": (
-    #     "rest_framework.throttling.ScopedRateThrottle",
-    #     "rest_framework.throttling.UserRateThrottle",
-    #     "rest_framework.throttling.AnonRateThrottle",
-    # ),
-    # "DEFAULT_THROTTLE_RATES": {
-    #     "otp": "5/minute",
-    #     "user": "1000/day",
-    #     "anon": "200/day",
-    # },
+    "DEFAULT_RENDERER_CLASSES": [
+        "config.api_response.ApiRenderer",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "config.api_response.ApiPagination",
+    "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "config.api_response.api_exception_handler",
 }
+
+# Enable rate limiting in production
+if not DEBUG:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = (
+        "rest_framework.throttling.ScopedRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    )
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        "otp": "3/minute",
+        "login": "5/minute",
+        "anon": "100/hour",
+    }
 
 # OpenSearch
 OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
-OPENSEARCH_INDEX_PREFIX = os.environ.get("OPENSEARCH_INDEX_PREFIX", "olxclone")
+OPENSEARCH_INDEX_PREFIX = os.environ.get("OPENSEARCH_INDEX_PREFIX", "sail")
 OPENSEARCH_INDEX_VERSION = int(os.environ.get("OPENSEARCH_INDEX_VERSION", "2"))
 
 # Celery (defaults are set in config/celery.py)
@@ -197,17 +231,46 @@ CELERY_BEAT_SCHEDULE = {
 # drf-spectacular
 SPECTACULAR_SETTINGS = {
     "TITLE": "Sail API",
-    "DESCRIPTION": "Classifieds platform API",
+    "DESCRIPTION": (
+        "Sail — C2C classifieds marketplace API.\n\n"
+        "All responses follow a standard envelope:\n"
+        "```json\n"
+        '{ "success": true, "data": <payload>, "error": null, "code": 200 }\n'
+        "```"
+    ),
     "VERSION": "1.0.0",
+    "CONTACT": {"name": "Sail Team"},
+    "SCHEMA_PATH_PREFIX": "/api/v1/",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+    ],
+    "TAGS": [
+        {"name": "auth", "description": "Authentication (OTP, email/password, Telegram)"},
+        {"name": "profile", "description": "User profile management"},
+        {"name": "security", "description": "Password & account linking"},
+        {"name": "listings", "description": "Listing CRUD & media"},
+        {"name": "search", "description": "Full-text search with filters"},
+        {"name": "chat", "description": "Chat threads & messages"},
+        {"name": "favorites", "description": "Favorites & recently viewed"},
+        {"name": "saved-searches", "description": "Saved search management"},
+        {"name": "taxonomy", "description": "Categories, locations, attributes"},
+        {"name": "moderation", "description": "Reporting & moderation queue"},
+        {"name": "currency", "description": "Currency config & conversion"},
+        {"name": "uploads", "description": "S3 presigned uploads"},
+        {"name": "telegram", "description": "Telegram chat configs & webhooks"},
+        {"name": "health", "description": "Health check & i18n"},
+    ],
 }
 
 # Telegram integration (login + bot usage)
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8314735056:AAEQSsb7cgR-VR4U6rPZ8z_pHLUViH2asc8")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+if not DEBUG and not TELEGRAM_BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN must be set in production!")
 TELEGRAM_LOGIN_MAX_AGE = int(os.environ.get("TELEGRAM_LOGIN_MAX_AGE", "86400"))  # seconds (default 1 day)
 TELEGRAM_WEBHOOK_SECRET_TOKEN = os.environ.get("TELEGRAM_WEBHOOK_SECRET_TOKEN", "")
 WEB_BASE_URL = os.environ.get("WEB_BASE_URL", "https://sail.uz")
-# If empty, webhook accepts all requests (less secure but simpler for dev)
-# In production, generate random token: openssl rand -hex 32
+# In production, set TELEGRAM_WEBHOOK_SECRET_TOKEN: openssl rand -hex 32
 
 # Logging (basic)
 LOGGING = {

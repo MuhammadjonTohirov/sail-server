@@ -6,6 +6,7 @@ import uuid
 
 from django.conf import settings
 from django.core.files.storage import default_storage
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
@@ -18,6 +19,18 @@ class ChatAttachmentUploadView(APIView):
     parser_classes = (MultiPartParser,)
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=["chat"],
+        summary="Upload a chat attachment",
+        description="Upload a file attachment for a chat thread. Returns the attachment metadata.",
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"type": "image", "url": "https://example.com/file.jpg", "name": "photo.jpg", "size": 102400, "content_type": "image/jpeg"}, "error": None, "code": 201},
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request, id: uuid.UUID):
         try:
             thread = ChatThread.objects.prefetch_related("participants").get(id=id)

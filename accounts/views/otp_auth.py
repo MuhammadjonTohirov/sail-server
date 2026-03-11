@@ -8,6 +8,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -26,6 +27,35 @@ class OTPRequestView(APIView):
     permission_classes: list = []
     throttle_scope = "otp"
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Request OTP code",
+        description="Send a one-time password to the specified phone number. "
+        "Rate-limited to 3 codes per 10 minutes per phone number. "
+        "In debug mode the generated code is returned in the response.",
+        request=OTPRequestSerializer,
+        responses={200: None, 400: None, 429: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"status": "sent"}, "error": None, "code": 200},
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid phone",
+                value={"success": False, "data": None, "error": "Invalid phone format.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+            OpenApiExample(
+                "Rate limited",
+                value={"success": False, "data": None, "error": "Too many requests. Try later.", "code": 429},
+                response_only=True,
+                status_codes=["429"],
+            ),
+        ],
+    )
     def post(self, request):
         ser = OTPRequestSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -61,6 +91,43 @@ class OTPVerifyView(APIView):
     permission_classes: list = []
     throttle_scope = "otp"
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Verify OTP code",
+        description="Verify the OTP code sent to the phone number. "
+        "On success, creates or retrieves the user account and returns JWT tokens with the user profile.",
+        request=OTPVerifySerializer,
+        responses={200: None, 400: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "profile": {"user_id": 1, "display_name": "User", "phone_e164": "+998901234567"},
+                    },
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid code",
+                value={"success": False, "data": None, "error": "Invalid code.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+            OpenApiExample(
+                "Expired code",
+                value={"success": False, "data": None, "error": "Code expired or not found.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+        ],
+    )
     def post(self, request):
         ser = OTPVerifySerializer(data=request.data)
         ser.is_valid(raise_exception=True)

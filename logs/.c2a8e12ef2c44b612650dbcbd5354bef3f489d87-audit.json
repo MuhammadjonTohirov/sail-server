@@ -6,9 +6,14 @@
     "auditLog": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/.c2a8e12ef2c44b612650dbcbd5354bef3f489d87-audit.json",
     "files": [
         {
-            "date": 1767075408628,
-            "name": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/mcp-puppeteer-2025-12-30.log",
-            "hash": "7d7b60e85f68b445d20cf55c97cb1c17191998f9bdeaa7bbfa2ce4c3d5cc8727"
+            "date": 1768992574720,
+            "name": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/mcp-puppeteer-2026-01-21.log",
+            "hash": "4f9fd37e315c2996c93212c67671132a49b7e246f4412a2ec7ad4340dbc365b7"
+        },
+        {
+            "date": 1770171354299,
+            "name": "/Users/r/Documents/Development/Personal/Startups/olx_clone/server/logs/mcp-puppeteer-2026-02-04.log",
+            "hash": "98b00b710b4b4f824264bbc0787080d77fe0a46c19db9202cc8585c7bd8cf7e0"
         }
     ],
     "hashType": "sha256"

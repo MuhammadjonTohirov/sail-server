@@ -1,11 +1,31 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import generics, permissions
 
 from ..models import Listing
 from ..serializers import ListingSerializer
 
 
+@extend_schema(
+    tags=["listings"],
+    summary="List user's listings",
+    description="Retrieve all active listings for a specific user. "
+    "Supports filtering by category slug and sorting by newest, oldest, or price.",
+    responses={200: ListingSerializer(many=True)},
+    examples=[
+        OpenApiExample(
+            "Success",
+            value={
+                "success": True,
+                "data": [{"id": 1, "title": "iPhone 15", "status": "active"}],
+                "error": None,
+                "code": 200,
+            },
+            response_only=True,
+        ),
+    ],
+)
 class UserListingsView(generics.ListAPIView):
     """Get all active listings for a specific user (public view)"""
     serializer_class = ListingSerializer

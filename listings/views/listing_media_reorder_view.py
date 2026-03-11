@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +13,31 @@ class ListingMediaReorderView(APIView):
     """Reorder media for a listing. Expects: {"media_ids": [3, 1, 2]}"""
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=["listings"],
+        summary="Reorder listing media",
+        description="Set the display order of media for a listing by providing an ordered list of media IDs.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {"media_ids": {"type": "array", "items": {"type": "integer"}}},
+                "required": ["media_ids"],
+            }
+        },
+        responses={200: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"media": [{"id": 3, "order": 0}, {"id": 1, "order": 1}, {"id": 2, "order": 2}]},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request, pk: int):
         try:
             listing = Listing.objects.get(pk=pk, user=request.user)

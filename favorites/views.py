@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +11,18 @@ from .models import FavoriteListing, RecentlyViewedListing
 from .serializers import FavoriteListingSerializer, RecentlyViewedListingSerializer
 
 
+@extend_schema(
+    tags=["favorites"],
+    summary="List favorite listings",
+    description="List all favorite listings for the authenticated user.",
+    examples=[
+        OpenApiExample(
+            "Success",
+            value={"success": True, "data": [{"id": 1, "listing": {"id": 10, "title": "iPhone 15"}, "created_at": "2025-01-01T00:00:00Z"}], "error": None, "code": 200},
+            response_only=True,
+        ),
+    ],
+)
 class FavoriteListingListView(generics.ListAPIView):
     """
     GET /api/v1/favorites
@@ -32,6 +45,23 @@ class FavoriteListingToggleView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=["favorites"],
+        summary="Toggle favorite listing",
+        description="Add or remove a listing from favorites. Returns the current favorited state.",
+        examples=[
+            OpenApiExample(
+                "Added",
+                value={"success": True, "data": {"favorited": True}, "error": None, "code": 201},
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Removed",
+                value={"success": True, "data": {"favorited": False}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request, listing_id: int):
         try:
             listing = Listing.objects.get(id=listing_id)
@@ -54,6 +84,12 @@ class FavoriteListingToggleView(APIView):
         return Response({"favorited": True}, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(
+    tags=["favorites"],
+    summary="Remove a favorite listing",
+    description="Remove a listing from the user's favorites.",
+    responses={204: None},
+)
 class FavoriteListingDeleteView(generics.DestroyAPIView):
     """
     DELETE /api/v1/favorites/<listing_id>
@@ -81,6 +117,18 @@ class FavoriteListingDeleteView(generics.DestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(
+    tags=["favorites"],
+    summary="List recently viewed listings",
+    description="List recently viewed listings for the authenticated user or anonymous session.",
+    examples=[
+        OpenApiExample(
+            "Success",
+            value={"success": True, "data": [{"id": 1, "listing": {"id": 10, "title": "iPhone 15"}, "viewed_at": "2025-01-01T00:00:00Z"}], "error": None, "code": 200},
+            response_only=True,
+        ),
+    ],
+)
 class RecentlyViewedListingListView(generics.ListAPIView):
     """
     GET /api/v1/recently-viewed
@@ -115,6 +163,18 @@ class RecentlyViewedListingTrackView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        tags=["favorites"],
+        summary="Track a viewed listing",
+        description="Record that a user viewed a listing. For anonymous users, uses X-Client-Session-Id header.",
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"tracked": True}, "error": None, "code": 201},
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request, listing_id: int):
         import time
         from django.db import OperationalError
@@ -182,6 +242,18 @@ class RecentlyViewedListingClearView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        tags=["favorites"],
+        summary="Clear recently viewed listings",
+        description="Clear all recently viewed listings for the authenticated user or anonymous session.",
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"deleted": 5}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def delete(self, request):
         if request.user.is_authenticated:
             count, _ = RecentlyViewedListing.objects.filter(user=request.user).delete()
@@ -211,6 +283,21 @@ class SuggestedListingsView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        tags=["favorites"],
+        summary="Get suggested listings",
+        description="Returns suggested listings based on the user's recently viewed items.",
+        parameters=[
+            OpenApiParameter(name="limit", description="Maximum number of suggestions (default 12)", required=False, type=int),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"results": [{"id": 1, "title": "iPhone 15"}], "count": 1, "based_on_categories": [3, 7]}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         limit = int(request.query_params.get('limit', 12))
 

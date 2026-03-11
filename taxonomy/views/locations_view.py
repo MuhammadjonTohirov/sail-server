@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -10,6 +11,21 @@ class LocationsView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["taxonomy"],
+        summary="List locations",
+        description="List root locations or children of a specific parent location.",
+        parameters=[
+            OpenApiParameter(name="parent_id", description="Filter by parent location ID", required=False, type=int),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": [{"id": 1, "name": "Tashkent", "slug": "tashkent"}], "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         parent_id = request.query_params.get("parent_id")
         lang = _lang_from_request(request)

@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -28,6 +29,62 @@ class TelegramLoginView(APIView):
     permission_classes: list = []
     throttle_scope = "auth"
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Login via Telegram",
+        description="Authenticate using Telegram Login Widget data. "
+        "Verifies the HMAC-SHA256 signature and auth_date, then creates or updates the user account. "
+        "Telegram profile photo is automatically synced.",
+        request=TelegramLoginSerializer,
+        responses={200: None, 400: None, 500: None, 503: None},
+        examples=[
+            OpenApiExample(
+                "Request body",
+                value={
+                    "id": 123456789,
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "username": "johndoe",
+                    "photo_url": "https://t.me/i/userpic/...",
+                    "auth_date": 1700000000,
+                    "hash": "abc123...",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "profile": {
+                            "user_id": 1,
+                            "display_name": "John Doe",
+                            "telegram_id": 123456789,
+                            "telegram_username": "johndoe",
+                        },
+                    },
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid signature",
+                value={"success": False, "data": None, "error": "Invalid Telegram login signature.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+            OpenApiExample(
+                "Not configured",
+                value={"success": False, "data": None, "error": "Telegram login not configured.", "code": 503},
+                response_only=True,
+                status_codes=["503"],
+            ),
+        ],
+    )
     def post(self, request):
         bot_token = settings.TELEGRAM_BOT_TOKEN
         if not bot_token:

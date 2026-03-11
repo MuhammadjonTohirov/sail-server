@@ -6,6 +6,7 @@ import logging
 import requests
 from django.conf import settings
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -80,6 +81,65 @@ class TelegramChatConfigViewSet(
             .order_by("-created_at")
         )
 
+    @extend_schema(
+        tags=["telegram"],
+        summary="List connected Telegram chats",
+        description="Return all Telegram channels and groups connected by the authenticated user.",
+        responses={200: TelegramChatConfigSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": [
+                        {
+                            "id": "uuid",
+                            "chat_id": -1001234567890,
+                            "chat_type": "channel",
+                            "chat_title": "My Channel",
+                            "is_active": True,
+                            "bot_status": "administrator",
+                        }
+                    ],
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=["telegram"],
+        summary="Get connected chat details",
+        description="Return details of a specific connected Telegram chat.",
+        responses={200: TelegramChatConfigSerializer, 404: None},
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=["telegram"],
+        summary="Disconnect a Telegram chat",
+        description="Remove a specific Telegram chat connection. The user would need to re-add the bot to reconnect.",
+        responses={200: None, 404: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"detail": "Chat 'My Channel' has been disconnected."},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def destroy(self, request, *args, **kwargs):
         """
         Disconnect/remove a specific chat.
@@ -98,6 +158,36 @@ class TelegramChatConfigViewSet(
 
         return Response({"detail": f"Chat '{chat_title}' has been disconnected."}, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        tags=["telegram"],
+        summary="Disconnect all Telegram chats",
+        description="Remove all connected Telegram chats for the authenticated user. Useful for bulk cleanup.",
+        responses={200: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"detail": "Successfully disconnected 3 chat(s)."},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "No chats",
+                value={
+                    "success": True,
+                    "data": {"detail": "No chats to disconnect."},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     @action(detail=False, methods=["post"], url_path="disconnect-all")
     def disconnect_all(self, request):
         """
@@ -117,6 +207,30 @@ class TelegramChatConfigViewSet(
 
         return Response({"detail": f"Successfully disconnected {count} chat(s)."}, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        tags=["telegram"],
+        summary="Get chat statistics",
+        description="Return aggregated statistics about connected Telegram chats including counts by type and active status.",
+        responses={200: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {
+                        "total": 5,
+                        "active": 4,
+                        "inactive": 1,
+                        "by_type": {"channel": 2, "supergroup": 2, "group": 1},
+                    },
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
         """
@@ -139,6 +253,26 @@ class TelegramChatConfigViewSet(
 
         return Response(stats)
 
+    @extend_schema(
+        tags=["telegram"],
+        summary="Verify all connected chats",
+        description="Check with the Telegram API whether the bot is still active in each connected chat "
+        "and update their is_active and bot_status fields accordingly.",
+        responses={200: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"verified": 3, "deactivated": 1, "errors": 0},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     @action(detail=False, methods=["post"], url_path="verify")
     def verify(self, request):
         """

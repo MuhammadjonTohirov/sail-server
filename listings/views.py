@@ -55,7 +55,7 @@ class ListingViewSet(viewsets.ModelViewSet):
         
         if not chat_ids or not isinstance(chat_ids, list):
             return Response(
-                {"error": "telegram_chat_ids list is required"}, 
+                {"detail": "telegram_chat_ids list is required"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -70,7 +70,7 @@ class ListingViewSet(viewsets.ModelViewSet):
         valid_chat_ids = list(valid_chats)
         if not valid_chat_ids:
              return Response(
-                {"error": "No valid active Telegram chats found for this user"}, 
+                {"detail": "No valid active Telegram chats found for this user"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -87,7 +87,7 @@ class ListingViewSet(viewsets.ModelViewSet):
         listing = self.get_object()
         if listing.media.count() >= 10:
             return Response(
-                {"error": "Maximum 10 images allowed per listing."},
+                {"detail": "Maximum 10 images allowed per listing."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -118,14 +118,14 @@ class ListingViewSet(viewsets.ModelViewSet):
         listing = self.get_object()
         media_id = request.query_params.get("media_id")
         if not media_id:
-            return Response({"error": "media_id required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "media_id required"}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             media = listing.media.get(id=media_id)
             media.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ListingMedia.DoesNotExist:
-            return Response({"error": "Media not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Media not found"}, status=status.HTTP_404_NOT_FOUND)
             
     @action(detail=True, methods=["post"])
     def deactivate(self, request, pk=None):

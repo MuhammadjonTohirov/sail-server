@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -17,6 +18,18 @@ class SyncChatAvailabilityView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["chat"],
+        summary="Sync listing availability for chat threads",
+        description="Sync listing availability status for all chat threads of the authenticated user.",
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"synced": 5, "updated": 2}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         user = request.user
 
@@ -74,6 +87,18 @@ class BulkListingStatusView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["chat"],
+        summary="Bulk check listing availability",
+        description="Check availability status for multiple listings at once. Maximum 100 listing IDs per request.",
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"statuses": {"1": "available", "2": "unavailable", "3": "deleted"}}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         listing_ids = request.data.get('listing_ids', [])
 
@@ -82,14 +107,14 @@ class BulkListingStatusView(APIView):
 
         if not isinstance(listing_ids, list):
             return Response(
-                {"error": "listing_ids must be a list"},
+                {"detail": "listing_ids must be a list"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Limit to prevent abuse
         if len(listing_ids) > 100:
             return Response(
-                {"error": "Maximum 100 listing IDs allowed"},
+                {"detail": "Maximum 100 listing IDs allowed"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -97,7 +122,7 @@ class BulkListingStatusView(APIView):
             listing_ids = [int(lid) for lid in listing_ids]
         except (TypeError, ValueError):
             return Response(
-                {"error": "Invalid listing ID format"},
+                {"detail": "Invalid listing ID format"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
