@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -12,6 +13,21 @@ class CategoriesTreeView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["taxonomy"],
+        summary="Get categories tree",
+        description="Get the full category tree or direct children of a specific parent category.",
+        parameters=[
+            OpenApiParameter(name="parent_id", description="Filter by parent category ID to get direct children", required=False, type=int),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": [{"id": 1, "name": "Electronics", "slug": "electronics", "icon": "laptop", "is_leaf": False, "children": []}], "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         parent_id = request.query_params.get("parent_id")
         lang = _lang_from_request(request)

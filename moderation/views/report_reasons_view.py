@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -102,6 +103,21 @@ REPORT_REASONS = [
 class ReportReasonsView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        tags=["moderation"],
+        summary="List report reasons",
+        description="Get the list of available report reasons with localized titles and descriptions.",
+        parameters=[
+            OpenApiParameter(name="lang", description="Language code (ru, uz, en). Default: ru", required=False, type=str),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"items": [{"code": "fraud", "title": "Fraud", "description": "Attempts to obtain money through deception"}]}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         lang = request.query_params.get("lang", "ru")
         if lang not in {"ru", "uz", "en"}:

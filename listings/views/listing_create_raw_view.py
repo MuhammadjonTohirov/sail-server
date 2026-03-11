@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +13,42 @@ from taxonomy.models import Category, Location
 class ListingCreateRawView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=["listings"],
+        summary="Create a listing (raw)",
+        description="Create a new listing by passing raw JSON fields directly, "
+        "bypassing the serializer validation. Useful for simple clients.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "category": {"type": "integer"},
+                    "location": {"type": "integer"},
+                    "description": {"type": "string"},
+                    "price_amount": {"type": "number"},
+                    "price_currency": {"type": "string"},
+                    "condition": {"type": "string"},
+                    "deal_type": {"type": "string"},
+                    "attributes": {"type": "array", "items": {"type": "object"}},
+                },
+                "required": ["title", "category", "location"],
+            }
+        },
+        responses={201: ListingSerializer},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"id": 1, "title": "iPhone 15", "status": "draft"},
+                    "error": None,
+                    "code": 201,
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         data = request.data or {}
 

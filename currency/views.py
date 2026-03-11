@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -15,6 +16,18 @@ class CurrencyConfigView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @extend_schema(
+        tags=["currency"],
+        summary="Get currency configuration",
+        description="Get all active currencies, exchange rates, and the default currency.",
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"currencies": [{"code": "UZS", "name": "Uzbek Sum", "symbol": "so'm"}], "exchange_rates": {"USD_UZS": 12500.0}, "default_currency": "UZS"}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         currencies = CurrencyService.get_active_currencies()
         exchange_rates = CurrencyService.get_exchange_rates()
@@ -38,6 +51,23 @@ class CurrencyConvertView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @extend_schema(
+        tags=["currency"],
+        summary="Convert currency",
+        description="Convert an amount from one currency to another.",
+        parameters=[
+            OpenApiParameter(name="amount", description="Amount to convert", required=True, type=float),
+            OpenApiParameter(name="from", description="Source currency code (e.g. USD)", required=True, type=str),
+            OpenApiParameter(name="to", description="Target currency code (e.g. UZS)", required=True, type=str),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"amount": 100.0, "from": "USD", "to": "UZS", "converted": 1250000.0, "rate": 12500.0}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         try:
             amount = Decimal(request.query_params.get("amount", "0"))
@@ -46,14 +76,14 @@ class CurrencyConvertView(APIView):
 
             if not from_currency or not to_currency:
                 return Response(
-                    {"error": "Both 'from' and 'to' currency codes are required"}, status=400
+                    {"detail": "Both 'from' and 'to' currency codes are required"}, status=400
                 )
 
             converted = CurrencyService.convert_price(amount, from_currency, to_currency)
 
             if converted is None:
                 return Response(
-                    {"error": f"Exchange rate not found for {from_currency} to {to_currency}"},
+                    {"detail": f"Exchange rate not found for {from_currency} to {to_currency}"},
                     status=404,
                 )
 
@@ -70,4 +100,4 @@ class CurrencyConvertView(APIView):
             )
 
         except (InvalidOperation, ValueError) as e:
-            return Response({"error": f"Invalid amount: {str(e)}"}, status=400)
+            return Response({"detail": f"Invalid amount: {str(e)}"}, status=400)

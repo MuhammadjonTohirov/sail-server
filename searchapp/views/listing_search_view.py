@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from django.conf import settings
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -57,6 +58,31 @@ class ListingSearchView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["search"],
+        summary="Search listings",
+        description="Search listings with full-text search, faceted filtering, and multi-currency price support.",
+        parameters=[
+            OpenApiParameter(name="q", description="Search query text", required=False, type=str),
+            OpenApiParameter(name="currency", description="Currency code for price filtering (default: UZS)", required=False, type=str),
+            OpenApiParameter(name="min_price", description="Minimum price in the specified currency", required=False, type=float),
+            OpenApiParameter(name="max_price", description="Maximum price in the specified currency", required=False, type=float),
+            OpenApiParameter(name="category_slug", description="Filter by category slug", required=False, type=str),
+            OpenApiParameter(name="location_slug", description="Filter by location slug", required=False, type=str),
+            OpenApiParameter(name="condition", description="Filter by condition (new/used)", required=False, type=str),
+            OpenApiParameter(name="user_id", description="Filter by user ID", required=False, type=int),
+            OpenApiParameter(name="sort", description="Sort order: relevance, newest, price_asc, price_desc", required=False, type=str),
+            OpenApiParameter(name="page", description="Page number (default: 1)", required=False, type=int),
+            OpenApiParameter(name="per_page", description="Results per page (default: 20, max: 50)", required=False, type=int),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"results": [{"id": "1", "title": "iPhone 15", "price": 500, "price_currency": "USD"}], "total": 1, "page": 1, "per_page": 20, "facets": {"categories": [], "locations": []}}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         client = get_client()
         if not client:

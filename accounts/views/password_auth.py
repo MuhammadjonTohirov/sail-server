@@ -8,6 +8,7 @@ from datetime import timedelta
 from django.contrib.auth import authenticate, get_user_model
 from django.db import transaction
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -32,6 +33,33 @@ class RegisterView(APIView):
     permission_classes: list = []
     throttle_scope = "otp"
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Register new account",
+        description="Start registration with email or phone and password. "
+        "An OTP code is sent for verification. Call register/verify to complete.",
+        request=RegisterSerializer,
+        responses={200: None, 400: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"status": "otp_sent", "login": "user@example.com"},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Already registered",
+                value={"success": False, "data": None, "error": "Email already registered.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+        ],
+    )
     def post(self, request):
         ser = RegisterSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -87,6 +115,41 @@ class RegisterVerifyView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Verify registration OTP",
+        description="Complete registration by verifying the OTP code. "
+        "Creates the user account and returns JWT tokens with the profile.",
+        responses={200: None, 400: None},
+        examples=[
+            OpenApiExample(
+                "Request body",
+                value={"login": "user@example.com", "code": "123456", "password": "securepass", "display_name": "John"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "profile": {"user_id": 1, "display_name": "John", "email": "user@example.com"},
+                    },
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid code",
+                value={"success": False, "data": None, "error": "Invalid code.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+        ],
+    )
     def post(self, request):
         # Expect: login, code, password, display_name
         login = request.data.get("login")
@@ -165,6 +228,37 @@ class LoginView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Login with credentials",
+        description="Authenticate with email or phone number and password. "
+        "Returns JWT tokens and the user profile on success.",
+        request=LoginSerializer,
+        responses={200: None, 400: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "profile": {"user_id": 1, "display_name": "John", "email": "user@example.com"},
+                    },
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid credentials",
+                value={"success": False, "data": None, "error": "Invalid credentials.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+        ],
+    )
     def post(self, request):
         ser = LoginSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -209,6 +303,28 @@ class ForgotPasswordView(APIView):
     permission_classes: list = []
     throttle_scope = "otp"
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Request password reset OTP",
+        description="Send an OTP code for password reset to the registered email or phone. "
+        "Does not reveal whether the account exists for security reasons.",
+        request=ForgotPasswordSerializer,
+        responses={200: None, 400: None, 429: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"status": "sent"}, "error": None, "code": 200},
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Rate limited",
+                value={"success": False, "data": None, "error": "Too many requests. Try later.", "code": 429},
+                response_only=True,
+                status_codes=["429"],
+            ),
+        ],
+    )
     def post(self, request):
         ser = ForgotPasswordSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -279,6 +395,33 @@ class ResetPasswordView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Reset password with OTP",
+        description="Reset the account password using a valid OTP code obtained via the forgot-password endpoint.",
+        request=ResetPasswordSerializer,
+        responses={200: None, 400: None, 404: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"status": "password_reset"}, "error": None, "code": 200},
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid code",
+                value={"success": False, "data": None, "error": "Invalid code.", "code": 400},
+                response_only=True,
+                status_codes=["400"],
+            ),
+            OpenApiExample(
+                "User not found",
+                value={"success": False, "data": None, "error": "User not found.", "code": 404},
+                response_only=True,
+                status_codes=["404"],
+            ),
+        ],
+    )
     def post(self, request):
         ser = ResetPasswordSerializer(data=request.data)
         ser.is_valid(raise_exception=True)

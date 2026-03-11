@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db.models import F
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,6 +16,25 @@ class ListingInterestView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        tags=["listings"],
+        summary="Track listing interest",
+        description="Record that a user showed interest in a listing, "
+        "for example by revealing the seller's phone number. Increments the interest counter.",
+        responses={200: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"tracked": True},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request, pk: int):
         try:
             listing = Listing.objects.get(id=pk, status=Listing.Status.ACTIVE)

@@ -10,6 +10,8 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from drf_spectacular.utils import extend_schema
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -32,7 +34,15 @@ class TelegramWebhookView(APIView):
 
     authentication_classes: list = []
     permission_classes: list = []
+    # Use plain JSON renderer — Telegram expects raw {"ok": true/false} responses
+    renderer_classes = [JSONRenderer]
 
+    @extend_schema(
+        tags=["telegram"],
+        summary="Telegram webhook endpoint",
+        description="Internal endpoint for receiving Telegram Bot API webhook updates. Not intended for client use.",
+        exclude=True,
+    )
     def post(self, request):
         """
         Process incoming Telegram webhook update.

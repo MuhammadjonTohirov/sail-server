@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,6 +17,31 @@ class ListingShareView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=["listings"],
+        summary="Share listing to Telegram",
+        description="Share a listing to one or more Telegram chats configured by the user.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {"telegram_chat_ids": {"type": "array", "items": {"type": "integer"}}},
+                "required": ["telegram_chat_ids"],
+            }
+        },
+        responses={200: None},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"status": "sharing_started", "chat_ids": [123, 456]},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request, pk: int):
         try:
             listing = Listing.objects.get(pk=pk, user=request.user)
@@ -26,7 +52,7 @@ class ListingShareView(APIView):
         
         if not chat_ids or not isinstance(chat_ids, list):
             return Response(
-                {"error": "telegram_chat_ids list is required"}, 
+                {"detail": "telegram_chat_ids list is required"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -40,7 +66,7 @@ class ListingShareView(APIView):
         valid_chat_ids = list(valid_chats)
         if not valid_chat_ids:
              return Response(
-                {"error": "No valid active Telegram chats found for this user"}, 
+                {"detail": "No valid active Telegram chats found for this user"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 

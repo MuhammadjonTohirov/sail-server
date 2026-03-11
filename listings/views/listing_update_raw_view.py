@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +13,41 @@ from taxonomy.models import Category, Location
 class ListingUpdateRawView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=["listings"],
+        summary="Update a listing (raw)",
+        description="Partially update a listing by passing raw JSON fields. "
+        "Only provided fields are updated. Only the owner can edit.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "price_amount": {"type": "number"},
+                    "price_currency": {"type": "string"},
+                    "category": {"type": "integer"},
+                    "location": {"type": "integer"},
+                    "condition": {"type": "string"},
+                    "deal_type": {"type": "string"},
+                    "attributes": {"type": "array", "items": {"type": "object"}},
+                },
+            }
+        },
+        responses={200: ListingSerializer},
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={
+                    "success": True,
+                    "data": {"id": 1, "title": "Updated Title", "status": "active"},
+                    "error": None,
+                    "code": 200,
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def patch(self, request, pk: int):
         data = request.data or {}
 

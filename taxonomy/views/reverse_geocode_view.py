@@ -1,5 +1,6 @@
 from math import sqrt
 
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -16,15 +17,31 @@ class ReverseGeocodeView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["taxonomy"],
+        summary="Reverse geocode coordinates",
+        description="Find the nearest location given latitude and longitude coordinates.",
+        parameters=[
+            OpenApiParameter(name="lat", description="Latitude coordinate", required=True, type=float),
+            OpenApiParameter(name="lon", description="Longitude coordinate", required=True, type=float),
+        ],
+        examples=[
+            OpenApiExample(
+                "Success",
+                value={"success": True, "data": {"id": 1, "name": "Tashkent", "slug": "tashkent", "path": "Uzbekistan > Tashkent", "distance": 0.01}, "error": None, "code": 200},
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         try:
             lat = float(request.query_params.get("lat", 0))
             lon = float(request.query_params.get("lon", 0))
         except (TypeError, ValueError):
-            return Response({"error": "Invalid coordinates"}, status=400)
+            return Response({"detail": "Invalid coordinates"}, status=400)
 
         if lat == 0 and lon == 0:
-            return Response({"error": "Coordinates required"}, status=400)
+            return Response({"detail": "Coordinates required"}, status=400)
 
         lang = _lang_from_request(request)
 
@@ -35,7 +52,7 @@ class ReverseGeocodeView(APIView):
         ).exclude(lat=0, lon=0)
 
         if not locations_with_coords.exists():
-            return Response({"error": "No locations with coordinates available"}, status=404)
+            return Response({"detail": "No locations with coordinates available"}, status=404)
 
         # Calculate distances and find nearest
         nearest = None
@@ -49,7 +66,7 @@ class ReverseGeocodeView(APIView):
                 nearest = loc
 
         if not nearest:
-            return Response({"error": "No nearby location found"}, status=404)
+            return Response({"detail": "No nearby location found"}, status=404)
 
         # Build the location path (from root to leaf)
         path_parts = []

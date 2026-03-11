@@ -11,7 +11,7 @@ from .opensearch_client import get_client
 
 
 def index_name() -> str:
-    prefix = getattr(settings, "OPENSEARCH_INDEX_PREFIX", "olxclone")
+    prefix = getattr(settings, "OPENSEARCH_INDEX_PREFIX", "sail")
     version = getattr(settings, "OPENSEARCH_INDEX_VERSION", 1)
     return f"{prefix}_listings_v{version}"
 
