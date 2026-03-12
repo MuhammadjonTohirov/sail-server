@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Dict, List
 
-from rest_framework import serializers
 from django.conf import settings
+from rest_framework import serializers
 
 from taxonomy.models import Attribute
 
 from .models import Listing, ListingAttributeValue, ListingMedia
+from .utils import (
+    get_user_profile,
+    get_listing_contact_details,
+    mask_phone,
+    normalize_price_amount,
+    sync_listing_contact_phone_mask,
+)
 
 
 class ListingMediaSerializer(serializers.ModelSerializer):
@@ -35,6 +43,9 @@ class ListingSerializer(serializers.ModelSerializer):
     seller = serializers.SerializerMethodField()
     price_normalized = serializers.SerializerMethodField()
     favorite_count = serializers.SerializerMethodField()
+    contact_phone_masked = serializers.SerializerMethodField()
+    contact_email = serializers.SerializerMethodField()
+    contact_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -87,11 +98,13 @@ class ListingSerializer(serializers.ModelSerializer):
         ]
 
     def get_attributes(self, obj: Listing) -> List[Dict[str, Any]]:  # pragma: no cover
-        rows = (
-            ListingAttributeValue.objects.filter(listing=obj)
-            .select_related("attribute")
-            .order_by("attribute_id", "id")
-        )
+        rows = getattr(obj, "prefetched_attribute_values", None)
+        if rows is None:
+            rows = (
+                ListingAttributeValue.objects.filter(listing=obj)
+                .select_related("attribute")
+                .order_by("attribute_id", "id")
+            )
         grouped: Dict[int, Dict[str, Any]] = {}
         for row in rows:
             attr = row.attribute
@@ -159,7 +172,7 @@ class ListingSerializer(serializers.ModelSerializer):
         user = getattr(obj, "user", None)
         if not user:
             return {}
-        profile = getattr(user, "profile", None)
+        profile = get_user_profile(user)
         name = ""
         avatar_url = ""
         logo = ""
@@ -167,7 +180,7 @@ class ListingSerializer(serializers.ModelSerializer):
         since = None
         last_active = None
         if profile:
-            name = profile.display_name or profile.phone_e164
+            name = profile.display_name or obj.contact_name or ""
             avatar_url = profile.avatar_url or ""
             since = profile.created_at
             logo = profile.logo.url if profile.logo else ""
@@ -190,14 +203,54 @@ class ListingSerializer(serializers.ModelSerializer):
         if obj.price_amount is None or obj.price_amount == 0:
             return 0.0
 
-        normalized = CurrencyService.normalize_price_to_base(
-            obj.price_amount, obj.price_currency
-        )
-        return float(normalized)
+        rate_cache = self.context.setdefault("_price_rate_cache", {})
+        currency = obj.price_currency or "UZS"
+        rate = rate_cache.get(currency)
+        if rate is None:
+            default_currency = self.context.get("_default_currency")
+            if default_currency is None:
+                default_currency = CurrencyService.get_default_currency()
+                self.context["_default_currency"] = default_currency
+
+            if not default_currency or currency == default_currency.code:
+                rate = Decimal("1")
+            else:
+                rate = CurrencyService.get_exchange_rate(currency, default_currency.code) or Decimal("1")
+                if not isinstance(rate, Decimal):
+                    rate = Decimal(str(rate))
+
+            rate_cache[currency] = rate
+
+        return normalize_price_amount(obj.price_amount, currency, rate)
 
     def get_favorite_count(self, obj: Listing) -> int:  # pragma: no cover
         """Return the number of users who favorited this listing"""
+        annotated = getattr(obj, "favorite_count", None)
+        if annotated is not None:
+            return int(annotated)
         return obj.favorited_by.count()
+
+    def _viewer_can_see_private_contact(self, obj: Listing) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return request.user.is_staff or request.user.id == obj.user_id
+
+    def get_contact_phone_masked(self, obj: Listing) -> str:  # pragma: no cover
+        contact = get_listing_contact_details(obj)
+        if contact["contact_phone"]:
+            return contact["contact_phone_masked"]
+        return mask_phone(obj.contact_phone_masked or "")
+
+    def get_contact_email(self, obj: Listing) -> str:  # pragma: no cover
+        if not self._viewer_can_see_private_contact(obj):
+            return ""
+        return get_listing_contact_details(obj)["contact_email"]
+
+    def get_contact_phone(self, obj: Listing) -> str:  # pragma: no cover
+        if not self._viewer_can_see_private_contact(obj):
+            return ""
+        return get_listing_contact_details(obj)["contact_phone"]
 
 
 class ListingAttributeInputSerializer(serializers.Serializer):
@@ -291,10 +344,10 @@ class ListingCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
         attrs_payload = validated_data.pop("attributes", [])
+        profile = get_user_profile(user)
 
         # Set default contact info from user profile if not provided
-        if hasattr(user, "profile"):
-            profile = user.profile
+        if profile:
             if not validated_data.get("contact_name") and profile.display_name:
                 validated_data["contact_name"] = profile.display_name
             if not validated_data.get("contact_email") and profile.email:
@@ -304,16 +357,11 @@ class ListingCreateSerializer(serializers.ModelSerializer):
 
         listing = Listing.objects.create(user=user, **validated_data)
 
-        # Simple phone masking from username (which is phone in our OTP flow)
-        if hasattr(user, "profile") and user.profile.phone_e164:
-            phone = user.profile.phone_e164
-        else:
-            phone = user.username
-        listing.contact_phone_masked = phone #phone[:4] + "****" + phone[-2:]
+        sync_listing_contact_phone_mask(listing)
         listing.save(update_fields=["contact_phone_masked"])
         if attrs_payload:
             self._save_attributes(listing, attrs_payload)
-        
+
         return listing
 
     def _save_attributes(self, listing: Listing, attrs_payload: List[Dict[str, Any]]):
@@ -487,6 +535,7 @@ class ListingUpdateSerializer(serializers.ModelSerializer):
         attrs_payload = validated_data.pop("attributes", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
+        sync_listing_contact_phone_mask(instance)
         instance.save()
         if attrs_payload is not None:
             # Recompute allowed attributes with possibly new category

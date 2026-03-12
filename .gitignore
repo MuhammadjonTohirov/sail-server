@@ -17,14 +17,18 @@ coverage.xml
 local_settings.py
 db.sqlite3
 *.sqlite3
+db.sqlite3-shm
+db.sqlite3-wal
 media/
 uploads/
 static/
 staticfiles/
+mock_data/generated_users.json
 
 # Environments
 .env
 .env.*
+!.env.example
 .venv/
 venv/
 ENV/

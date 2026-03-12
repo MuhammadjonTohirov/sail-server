@@ -167,6 +167,9 @@ def index_listing(listing_id: int):
     except Listing.DoesNotExist:
         delete_listing(listing_id)
         return
+    if listing.status != Listing.Status.ACTIVE:
+        delete_listing(listing_id)
+        return
     doc = build_document(listing)
     client.index(index=index_name(), id=str(listing_id), body=doc)  # type: ignore[arg-type]
 

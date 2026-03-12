@@ -1,137 +1,244 @@
-# Server (Django) — Local Development
+# Server (Django)
 
-Quick start (no Docker):
+This repository is the Django API server for Sail.
 
-1) Create a virtual environment and install deps
-```
-cd server
+## Local Development
+
+### Requirements
+
+- Python 3.11+
+- `pip`
+- A Docker-compatible daemon only if you want OpenSearch-backed search endpoints
+
+`build.sh` is not a starter script. It installs dependencies, collects static files, and runs migrations for build/deploy use. For local development, use the steps below.
+
+### Quick Start
+
+Run everything from the repository root:
+
+```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-```
-
-2) Configure env (optional; defaults are fine for dev)
-```
 cp .env.example .env
-```
-
-3) Run migrations and start the dev server
-```
 python manage.py migrate
-python manage.py seed_taxonomy  # optional: add sample categories/locations
+python manage.py seed_taxonomy  # optional sample categories/locations
 python manage.py runserver 0.0.0.0:8080
 ```
 
-Health checks
-- Liveness: http://localhost:8080/healthz/
-- API health: http://localhost:8080/api/v1/health
-- Language: GET/POST http://localhost:8080/api/v1/i18n (POST {"lang":"ru|uz"} sets cookie)
+The copied `.env` enables `DJANGO_DEBUG=1`, so the server boots locally without extra production-only settings.
 
-Internationalization (i18n)
-- Default language is Russian (`ru`); Uzbek (`uz`) is enabled.
-- Django uses `LocaleMiddleware` and respects `Accept-Language` or user session.
-- Frontend (Next.js) uses subpath routing: `/ru/...` (default) and `/uz/...`.
-- You can switch locales via the header toggle in the web client.
+### Optional Local Services
 
-Taxonomy endpoints
-- Categories tree: http://localhost:8080/api/v1/categories
-- Category attributes: http://localhost:8080/api/v1/categories/1/attributes
-- Locations root: http://localhost:8080/api/v1/locations
-- Locations children: http://localhost:8080/api/v1/locations?parent_id=1
-- Localization: append `?lang=ru|uz` to taxonomy endpoints (e.g., `/api/v1/categories?lang=uz`). If omitted, defaults to `ru` or uses `Accept-Language`.
+#### OpenSearch for search endpoints
 
-Auth (OTP) flow
+Search endpoints depend on OpenSearch. The app defaults to `http://localhost:9200`.
+
+```bash
+./scripts/opensearch_up.sh
+python manage.py search_init_index
+python manage.py search_check
+```
+
+Notes:
+
+- The helper script expects `docker` to be available in `PATH`.
+- The first image pull is large and can take a few minutes.
+- If OpenSearch is not running, the core API can still start, but search endpoints will not work.
+- Run `python manage.py search_reindex` after you already have listing data that should be searchable.
+
+#### Redis for Celery
+
+Redis is optional in local development.
+
+- Without `REDIS_URL` or `CELERY_BROKER_URL`, Celery falls back to `memory://` in debug mode and tasks run eagerly.
+- With Redis running, set one of those variables and start workers:
+
+```bash
+celery -A config worker -l info
+celery -A config beat -l info
+```
+
+## Health Checks
+
+- Liveness: `http://localhost:8080/healthz/`
+- API health: `http://localhost:8080/api/v1/health`
+- Language: `GET` or `POST http://localhost:8080/api/v1/i18n`
+
+## Configuration
+
+Copy `.env.example` to `.env` for local work. The example file is shell-compatible and documents the main settings.
+
+### Required for local development
+
+- `DJANGO_DEBUG=1`
+
+### Required when `DJANGO_DEBUG=0`
+
+- `DJANGO_SECRET_KEY`
+- `DJANGO_ALLOWED_HOSTS`
+- `CORS_ALLOWED_ORIGINS`
+- `TELEGRAM_BOT_TOKEN`
+- `CELERY_BROKER_URL` or `REDIS_URL`
+
+### Common settings
+
+- Database:
+  - SQLite is the default.
+  - Set `POSTGRES_HOST`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and optionally `POSTGRES_PORT` to use Postgres.
+- Search:
+  - `OPENSEARCH_URL` defaults to `http://localhost:9200`
+  - `OPENSEARCH_VERIFY_CERTS` defaults to `false`
+  - `OPENSEARCH_INDEX_PREFIX` defaults to `sail`
+  - `OPENSEARCH_INDEX_VERSION` defaults to `2`
+- Localization:
+  - `LANGUAGE_CODE` defaults to `ru`
+  - `TIME_ZONE` defaults to `Asia/Tashkent`
+- Telegram/web:
+  - `WEB_BASE_URL` defaults to `https://sail.uz`
+  - `TELEGRAM_WEBHOOK_SECRET_TOKEN` should be set in production
+- Admin bootstrap:
+  - `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+
+## Auth (OTP)
+
 - Request code:
-  - POST http://localhost:8080/api/v1/auth/otp/request
-  - Body: {"phone": "+998901112233"}
-  - In DEBUG with OTP_DEV_CODE set, response includes {"debug_code":"000000"}
+  - `POST http://localhost:8080/api/v1/auth/otp/request`
+  - Body: `{"phone": "+998901112233"}`
 - Verify code:
-  - POST http://localhost:8080/api/v1/auth/otp/verify
-  - Body: {"phone": "+998901112233", "code": "000000"}
-  - Response: { access, refresh, profile }
-- Me endpoint:
-  - GET http://localhost:8080/api/v1/me with header Authorization: Bearer <access>
+  - `POST http://localhost:8080/api/v1/auth/otp/verify`
+  - Body: `{"phone": "+998901112233", "code": "000000"}`
+- Me:
+  - `GET http://localhost:8080/api/v1/me`
+  - Header: `Authorization: Bearer <access>`
 
-Admin (dev)
-- Create a superuser quickly (dev defaults: admin/admin123):
-  - python manage.py create_admin
-  - Visit http://localhost:8080/admin/
+In debug mode the OTP request response includes `debug_code`. If `OTP_DEV_CODE` is set, that fixed value is returned; otherwise a random debug code is generated and returned.
 
-Listings
-- Create listing (JWT required):
-  - POST http://localhost:8080/api/v1/listings
-  - Body JSON example (with attributes):
-    {
-      "title": "iPhone 13 128GB",
-      "description": "Good condition",
-      "price_amount": "4500000",
-      "price_currency": "UZS",
-      "condition": "used",
-      "category": 1,
-      "location": 1,
-      "lat": 41.31,
-      "lon": 69.27,
-      "attributes": [
-        { "attribute": 1, "value": "Apple" },           // select (required)
-        { "attribute": 2, "value": 2021 },               // number (min/max enforced if configured)
-        { "attribute": 3, "value": ["128"] }            // multiselect example
-      ]
+### OTP throttling
+
+- In all modes, the OTP request view enforces at most 3 codes per 10 minutes per phone number.
+- When `DJANGO_DEBUG=0`, DRF throttles are also enabled:
+  - `otp`: `3/minute`
+  - `login`: `5/minute`
+  - `anon`: `100/hour`
+
+## Admin (dev)
+
+Create a superuser with the management command:
+
+```bash
+python manage.py create_admin
+```
+
+Defaults come from `.env` or fall back to:
+
+- username: `admin`
+- email: `admin@example.com`
+- password: `admin123`
+
+Admin UI: `http://localhost:8080/admin/`
+
+## Taxonomy
+
+- Categories tree: `http://localhost:8080/api/v1/categories`
+- Category attributes: `http://localhost:8080/api/v1/categories/1/attributes`
+- Locations root: `http://localhost:8080/api/v1/locations`
+- Locations children: `http://localhost:8080/api/v1/locations?parent_id=1`
+- Localization: append `?lang=ru|uz`
+
+## Listings
+
+- Full listings API reference: [docs/listings-api.md](docs/listings-api.md)
+- Create listing: `POST http://localhost:8080/api/v1/listings`
+- My listings: `GET http://localhost:8080/api/v1/my/listings`
+- Listing detail: `GET http://localhost:8080/api/v1/listings/<id>`
+- Update listing: `PATCH http://localhost:8080/api/v1/listings/<id>/edit`
+- Bump listing: `POST http://localhost:8080/api/v1/listings/<id>/refresh`
+- Upload photo: `POST http://localhost:8080/api/v1/listings/<id>/media`
+
+Example create payload:
+
+```json
+{
+  "title": "iPhone 13 128GB",
+  "description": "Good condition",
+  "price_amount": "4500000",
+  "price_currency": "UZS",
+  "condition": "used",
+  "category": 1,
+  "location": 1,
+  "lat": 41.31,
+  "lon": 69.27,
+  "attributes": [
+    { "attribute": 1, "value": "Apple" },
+    { "attribute": 2, "value": 2021 },
+    { "attribute": 3, "value": ["128"] }
+  ]
+}
+```
+
+## Search
+
+- Search endpoint: `GET http://localhost:8080/api/v1/search/listings?q=iphone&sort=newest&per_page=10`
+- Common filters:
+  - `category_slug=phones`
+  - `location_slug=tashkent`
+  - `min_price=100000`
+  - `max_price=10000000`
+  - `attrs.brand=Apple`
+  - `attrs.storage=128`
+
+Useful management commands:
+
+```bash
+python manage.py search_check
+python manage.py search_init_index
+python manage.py search_reindex
+```
+
+## Saved Searches
+
+- Create/list: `POST` or `GET http://localhost:8080/api/v1/saved-searches`
+- Run now: `POST http://localhost:8080/api/v1/saved-searches/<id>/run`
+- Dev runner: `python manage.py savedsearches_run`
+
+Example body:
+
+```json
+{
+  "title": "Cheap iPhones",
+  "query": {
+    "params": {
+      "q": "iphone",
+      "max_price": 5000000
     }
-- My listings: GET http://localhost:8080/api/v1/my/listings
-- Listing detail: GET http://localhost:8080/api/v1/listings/<id>
-- Update listing (owner): PATCH http://localhost:8080/api/v1/listings/<id>/edit
-  - You can also pass "attributes" array in the same shape as create. Existing values are replaced.
-  - If you pass attributes, all required category attributes must be present and valid.
-- Bump listing (owner): POST http://localhost:8080/api/v1/listings/<id>/refresh
-- Upload photo (owner):
-  - POST http://localhost:8080/api/v1/listings/<id>/media with form-data key "file" = image
-  - Returns uploaded media with absolute URL
+  },
+  "frequency": "daily"
+}
+```
 
-Search & Facets
-- Configure OpenSearch URL (default http://localhost:56984) in `.env` as `OPENSEARCH_URL`.
-- Ensure index exists:
-  - Index is auto-created on first index request; or run a search to trigger create.
-- Endpoints:
-  - GET http://localhost:8080/api/v1/search/listings?q=iphone&sort=newest&per_page=10
-  - Filters via query params:
-    - category_slug=phones, location_slug=tashkent, min_price=100000, max_price=10000000
-    - Attribute filters: use `attrs.<key>=<value>`, e.g., `attrs.brand=Apple`, `attrs.storage=128`
+## Moderation
 
-Saved Searches
-- Create/list: POST/GET http://localhost:8080/api/v1/saved-searches (JWT required)
-  - Body example: {"title":"Cheap iPhones","query":{"params":{"q":"iphone","max_price":5000000}},"frequency":"daily"}
-- Run now: POST http://localhost:8080/api/v1/saved-searches/<id>/run
+- Report listing: `POST http://localhost:8080/api/v1/reports`
+- Staff queue: `GET http://localhost:8080/api/v1/moderation/queue`
 
-Moderation
-- Report listing: POST http://localhost:8080/api/v1/reports
-  - Body: {"listing": <id>, "reason_code": "spam", "notes": "optional"}
-- Staff queue: GET http://localhost:8080/api/v1/moderation/queue (admin only)
+Example report body:
 
-Uploads (S3 presign)
-- Presign: POST http://localhost:8080/api/v1/uploads/presign (JWT)
-  - Returns mode: "s3" with presigned POST, or "local" if not configured.
-  - Env vars: MEDIA_BUCKET, MEDIA_ENDPOINT, MEDIA_ACCESS_KEY, MEDIA_SECRET_KEY, AWS_REGION
+```json
+{
+  "listing": 1,
+  "reason_code": "spam",
+  "notes": "optional"
+}
+```
 
-API Docs
-- OpenAPI schema: GET http://localhost:8080/api/schema/
-- Swagger UI: GET http://localhost:8080/api/docs/
+## API Docs
 
-Throttling
-- OTP endpoints scoped to 5/min (configurable). Global anon/user limits also applied.
+- OpenAPI schema: `GET http://localhost:8080/api/schema/`
+- Swagger UI: `GET http://localhost:8080/api/docs/`
 
-Management commands
-- Initialize index: `python manage.py search_init_index`
-- Reindex all listings: `python manage.py search_reindex`
-- Run saved searches (dev): `python manage.py savedsearches_run`
+## Current Limitations
 
-Background workers (Celery)
-- Optional: set a broker (Redis) in `.env` as `REDIS_URL=redis://localhost:6379/0`.
-- Without a broker, tasks run eagerly (synchronously) by default in dev.
-- With Redis running, start workers:
-  - celery -A config worker -l info
-
-Notes
-- Uses SQLite by default; set POSTGRES_* envs to switch to Postgres.
-- CORS is open in DEBUG. For production, set `CORS_ALLOWED_ORIGINS`.
-- Time zone defaults to Asia/Tashkent; override via `TIME_ZONE`.
+- The standalone `POST /api/v1/uploads/presign` endpoint is not enabled in this repository. Do not rely on that route.
+- Development media uploads are served from `MEDIA_ROOT` under `/media/`.

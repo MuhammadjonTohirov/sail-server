@@ -3,7 +3,7 @@ from __future__ import annotations
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import generics, permissions
 
-from ..models import Listing
+from ..querysets import listing_fetch_queryset
 from ..serializers import ListingSerializer
 
 
@@ -30,4 +30,4 @@ class MyListingsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Listing.objects.filter(user=self.request.user).prefetch_related("media")
+        return listing_fetch_queryset().filter(user=self.request.user)

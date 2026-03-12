@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 from django.conf import settings
@@ -31,6 +32,79 @@ def _parse_filters(params) -> Dict[str, Any]:
         elif k in {"category_slug", "location_slug", "min_price", "max_price", "condition", "currency", "user_id"}:
             filters[k] = values[-1]
     return filters
+
+
+def _build_text_query(query: str) -> Dict[str, Any]:
+    tokens = [token.strip() for token in re.split(r"\s+", query) if token.strip()]
+    if not tokens:
+        return {"match_all": {}}
+
+    must_clauses: List[Dict[str, Any]] = []
+    for token in tokens:
+        normalized = _normalize_query_token(token)
+        token_shoulds: List[Dict[str, Any]] = [
+            {
+                "multi_match": {
+                    "query": token,
+                    "fields": ["title^5", "description^2"],
+                    "type": "best_fields",
+                }
+            },
+            {
+                "multi_match": {
+                    "query": token,
+                    "fields": ["title^6", "description^2"],
+                    "type": "phrase_prefix",
+                }
+            },
+            {
+                "multi_match": {
+                    "query": token,
+                    "fields": ["title^4", "description"],
+                    "type": "best_fields",
+                    "fuzziness": "AUTO",
+                }
+            },
+        ]
+
+        if len(normalized) >= 3:
+            token_shoulds.extend(
+                [
+                    {
+                        "wildcard": {
+                            "title": {
+                                "value": f"*{normalized}*",
+                                "boost": 2.5,
+                            }
+                        }
+                    },
+                    {
+                        "wildcard": {
+                            "description": {
+                                "value": f"*{normalized}*",
+                                "boost": 1.0,
+                            }
+                        }
+                    },
+                ]
+            )
+
+        must_clauses.append(
+            {
+                "bool": {
+                    "should": token_shoulds,
+                    "minimum_should_match": 1,
+                }
+            }
+        )
+
+    return {"bool": {"must": must_clauses}}
+
+
+def _normalize_query_token(token: str) -> str:
+    cleaned = token.strip().lower()
+    cleaned = cleaned.replace("*", "").replace("?", "")
+    return cleaned
 
 
 class ListingSearchView(APIView):
@@ -113,13 +187,7 @@ class ListingSearchView(APIView):
         filter_clauses: List[Dict[str, Any]] = []
 
         if q:
-            must.append({
-                "multi_match": {
-                    "query": q,
-                    "fields": ["title^2", "description"],
-                    "type": "best_fields",
-                }
-            })
+            must.append(_build_text_query(q))
 
         # Category filter: requires full path slug match; we accept single slug and filter on prefix
         if slug := filters.get("category_slug"):

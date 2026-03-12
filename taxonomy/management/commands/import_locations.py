@@ -1,165 +1,185 @@
-"""
-Django management command to import Uzbekistan regions and districts data.
+from __future__ import annotations
 
-Usage:
-    python manage.py import_locations
-"""
-import json
-from pathlib import Path
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
+
 from taxonomy.models import Location
+
+from ._seed_utils import load_json_records, make_uz_slug, resolve_uzbekistan_data_dir
 
 
 class Command(BaseCommand):
-    help = 'Import Uzbekistan regions and districts from JSON files'
+    help = "Import Uzbekistan regions and districts from the shared resources dataset."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--data-dir',
+            "--data-dir",
             type=str,
-            default='resources/uzbekistan-regions-data-master/JSON',
-            help='Path to the directory containing regions.json and districts.json'
+            default=None,
+            help="Path to the JSON directory or the shared resources root.",
         )
         parser.add_argument(
-            '--clear',
-            action='store_true',
-            help='Clear existing location data before import'
+            "--clear",
+            action="store_true",
+            help="Clear existing location data before import.",
+        )
+        parser.add_argument(
+            "--regions-only",
+            action="store_true",
+            help="Import only the 14 regions and skip districts/cities.",
         )
 
     def handle(self, *args, **options):
-        data_dir = Path(options['data_dir'])
+        data_dir = resolve_uzbekistan_data_dir(options.get("data_dir"))
+        if not data_dir:
+            raise CommandError("Uzbekistan JSON data directory not found. Pass --data-dir with a valid path.")
 
-        if not data_dir.exists():
-            self.stdout.write(self.style.ERROR(f'Data directory not found: {data_dir}'))
-            return
-
-        regions_file = data_dir / 'regions.json'
-        districts_file = data_dir / 'districts.json'
-
-        if not regions_file.exists():
-            self.stdout.write(self.style.ERROR(f'Regions file not found: {regions_file}'))
-            return
-
-        if not districts_file.exists():
-            self.stdout.write(self.style.ERROR(f'Districts file not found: {districts_file}'))
-            return
-
-        # Clear existing data if requested
-        if options['clear']:
-            self.stdout.write('Clearing existing location data...')
+        if options["clear"]:
+            self.stdout.write("Clearing existing location data...")
             Location.objects.all().delete()
-            self.stdout.write(self.style.SUCCESS('✓ Cleared existing data'))
 
-        try:
-            with transaction.atomic():
-                # Create Uzbekistan as country
-                uzbekistan, created = Location.objects.get_or_create(
-                    kind=Location.Kind.COUNTRY,
-                    name='Uzbekistan',
-                    defaults={
-                        'name_ru': 'Узбекистан',
-                        'name_uz': 'O\'zbekiston',
-                        'slug': 'uzbekistan',
-                    }
+        self.stdout.write(f"Using location dataset: {data_dir}")
+
+        with transaction.atomic():
+            country = self._upsert_country()
+            regions = load_json_records(data_dir, "regions.json")
+            region_map, region_created, region_updated = self._upsert_regions(country, regions)
+
+            district_created = district_updated = 0
+            city_created = city_updated = 0
+
+            if not options["regions_only"]:
+                districts = load_json_records(data_dir, "districts.json")
+                district_created, district_updated, city_created, city_updated = self._upsert_districts(
+                    region_map, districts
                 )
-                if created:
-                    self.stdout.write(self.style.SUCCESS('✓ Created Uzbekistan country'))
 
-                # Import regions
-                self.stdout.write('Importing regions...')
-                with open(regions_file, 'r', encoding='utf-8-sig') as f:
-                    regions_data = json.load(f)
+        self.stdout.write(
+            self.style.SUCCESS(
+                "Locations imported "
+                f"(regions created: {region_created}, regions updated: {region_updated}, "
+                f"districts created: {district_created}, districts updated: {district_updated}, "
+                f"cities created: {city_created}, cities updated: {city_updated})."
+            )
+        )
+        self.stdout.write(f"Total locations: {Location.objects.count()}")
+        self.stdout.write(f"Regions: {Location.objects.filter(kind=Location.Kind.REGION).count()}")
+        self.stdout.write(f"Districts: {Location.objects.filter(kind=Location.Kind.DISTRICT).count()}")
+        self.stdout.write(f"Cities: {Location.objects.filter(kind=Location.Kind.CITY).count()}")
 
-                region_map = {}  # Map original ID to Location object
-                for region in regions_data:
-                    location, created = Location.objects.get_or_create(
-                        kind=Location.Kind.REGION,
-                        parent=uzbekistan,
-                        name=region['name_uz'],
-                        defaults={
-                            'name_ru': region.get('name_ru', ''),
-                            'name_uz': region.get('name_uz', ''),
-                            'slug': self._make_slug(region['name_uz']),
-                        }
-                    )
-                    region_map[region['id']] = location
+    def _upsert_country(self) -> Location:
+        country, created = Location.objects.get_or_create(
+            kind=Location.Kind.COUNTRY,
+            slug="uzbekistan",
+            defaults={
+                "name": "Uzbekistan",
+                "name_ru": "Узбекистан",
+                "name_uz": "O'zbekiston",
+            },
+        )
+        changed = False
+        changed |= self._assign(country, "name", "Uzbekistan")
+        changed |= self._assign(country, "name_ru", "Узбекистан")
+        changed |= self._assign(country, "name_uz", "O'zbekiston")
+        if changed and not created:
+            country.save(update_fields=["name", "name_ru", "name_uz"])
+        return country
 
-                    if created:
-                        self.stdout.write(f'  ✓ Created region: {location.name}')
+    def _upsert_regions(self, country: Location, regions: list[dict]) -> tuple[dict[int, Location], int, int]:
+        region_map: dict[int, Location] = {}
+        created = 0
+        updated = 0
 
-                self.stdout.write(self.style.SUCCESS(f'✓ Imported {len(regions_data)} regions'))
+        for row in regions:
+            name_uz = self._clean_text(row.get("name_uz"))
+            name_ru = self._clean_text(row.get("name_ru"))
+            slug = make_uz_slug(name_uz)
 
-                # Import districts
-                self.stdout.write('Importing districts...')
-                with open(districts_file, 'r', encoding='utf-8-sig') as f:
-                    districts_data = json.load(f)
+            location = (
+                Location.objects.filter(kind=Location.Kind.REGION, parent=country)
+                .filter(Q(slug=slug) | Q(name_uz=name_uz) | Q(name_ru=name_ru) | Q(name=name_uz))
+                .first()
+            )
 
-                district_count = 0
-                city_count = 0
+            was_created = location is None
+            if location is None:
+                location = Location(kind=Location.Kind.REGION, parent=country, slug=slug)
 
-                for district in districts_data:
-                    region_id = district.get('region_id')
-                    parent_location = region_map.get(region_id)
+            changed = self._assign(location, "kind", Location.Kind.REGION)
+            changed |= self._assign(location, "parent", country)
+            changed |= self._assign(location, "name", name_uz)
+            changed |= self._assign(location, "name_ru", name_ru)
+            changed |= self._assign(location, "name_uz", name_uz)
+            changed |= self._assign(location, "slug", slug)
 
-                    if not parent_location:
-                        self.stdout.write(
-                            self.style.WARNING(f'  ⚠ Skipping {district["name_uz"]} - parent region not found')
-                        )
-                        continue
+            if was_created:
+                location.save()
+                created += 1
+            elif changed:
+                location.save(update_fields=["kind", "parent", "name", "name_ru", "name_uz", "slug"])
+                updated += 1
 
-                    # Determine if it's a city or district based on SOATO
-                    # Cities typically have SOATO ending in 401, 403, etc.
-                    soato_str = str(district.get('soato_id', ''))
-                    is_city = soato_str[-3:].startswith('4')
+            region_map[row["id"]] = location
 
-                    kind = Location.Kind.CITY if is_city else Location.Kind.DISTRICT
+        return region_map, created, updated
 
-                    location, created = Location.objects.get_or_create(
-                        kind=kind,
-                        parent=parent_location,
-                        name=district['name_uz'],
-                        defaults={
-                            'name_ru': district.get('name_ru', ''),
-                            'name_uz': district.get('name_uz', ''),
-                            'slug': self._make_slug(district['name_uz']),
-                        }
-                    )
+    def _upsert_districts(self, region_map: dict[int, Location], districts: list[dict]) -> tuple[int, int, int, int]:
+        district_created = district_updated = 0
+        city_created = city_updated = 0
 
-                    if created:
-                        if is_city:
-                            city_count += 1
-                        else:
-                            district_count += 1
+        for row in districts:
+            parent = region_map.get(row.get("region_id"))
+            if not parent:
+                self.stderr.write(f"Skipping district without parent region: {row.get('name_uz', '')}")
+                continue
 
-                self.stdout.write(self.style.SUCCESS(
-                    f'✓ Imported {district_count} districts and {city_count} cities'
-                ))
-                self.stdout.write(self.style.SUCCESS(
-                    f'\n✅ Successfully imported all location data!'
-                ))
-                self.stdout.write(f'   Total locations: {Location.objects.count()}')
+            name_uz = self._clean_text(row.get("name_uz"))
+            name_ru = self._clean_text(row.get("name_ru"))
+            slug = make_uz_slug(name_uz)
+            kind = self._district_kind(row.get("soato_id"))
 
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'❌ Error importing data: {str(e)}'))
-            raise
+            location = (
+                Location.objects.filter(parent=parent)
+                .filter(Q(slug=slug) | Q(name_uz=name_uz) | Q(name_ru=name_ru) | Q(name=name_uz))
+                .first()
+            )
 
-    def _make_slug(self, name):
-        """Create a slug from Uzbek/Russian text"""
-        # Simple transliteration for common Uzbek/Russian characters
-        replacements = {
-            'ʻ': '', "'": '', '\'': '',
-            'ў': 'o', 'ғ': 'g', 'қ': 'q',
-            'ҳ': 'h', 'Ў': 'O', 'Ғ': 'G',
-            'Қ': 'Q', 'Ҳ': 'H',
-        }
+            was_created = location is None
+            if location is None:
+                location = Location(parent=parent, slug=slug, kind=kind)
 
-        slug = name.lower()
-        for old, new in replacements.items():
-            slug = slug.replace(old, new)
+            changed = self._assign(location, "kind", kind)
+            changed |= self._assign(location, "parent", parent)
+            changed |= self._assign(location, "name", name_uz)
+            changed |= self._assign(location, "name_ru", name_ru)
+            changed |= self._assign(location, "name_uz", name_uz)
+            changed |= self._assign(location, "slug", slug)
 
-        # Remove special characters and replace spaces
-        slug = ''.join(c if c.isalnum() or c in '-_' else '-' for c in slug)
-        slug = '-'.join(filter(None, slug.split('-')))  # Remove duplicate dashes
+            if was_created:
+                location.save()
+                if kind == Location.Kind.CITY:
+                    city_created += 1
+                else:
+                    district_created += 1
+            elif changed:
+                location.save(update_fields=["kind", "parent", "name", "name_ru", "name_uz", "slug"])
+                if kind == Location.Kind.CITY:
+                    city_updated += 1
+                else:
+                    district_updated += 1
 
-        return slug[:255]  # Ensure it fits in the field
+        return district_created, district_updated, city_created, city_updated
+
+    def _district_kind(self, soato_id) -> str:
+        soato = str(soato_id or "")
+        return Location.Kind.CITY if soato[-3:].startswith("4") else Location.Kind.DISTRICT
+
+    def _clean_text(self, value) -> str:
+        return str(value or "").strip()
+
+    def _assign(self, location: Location, field: str, value) -> bool:
+        if getattr(location, field) == value:
+            return False
+        setattr(location, field, value)
+        return True

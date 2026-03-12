@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from drf_spectacular.utils import extend_schema, OpenApiExample
+from django.db.models import Q
 from rest_framework import generics, permissions
 
 from ..models import Listing
+from ..querysets import listing_fetch_queryset
 from ..serializers import ListingSerializer
 
 
@@ -32,6 +34,12 @@ from ..serializers import ListingSerializer
     ],
 )
 class ListingDetailView(generics.RetrieveAPIView):
-    queryset = Listing.objects.select_related("category", "location", "user").prefetch_related("media")
     serializer_class = ListingSerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = listing_fetch_queryset()
+        request = self.request
+        if request.user.is_authenticated:
+            return queryset.filter(Q(status=Listing.Status.ACTIVE) | Q(user=request.user))
+        return queryset.filter(status=Listing.Status.ACTIVE)

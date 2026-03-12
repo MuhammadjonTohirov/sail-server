@@ -4,6 +4,7 @@ from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import generics, permissions
 
 from ..models import Listing
+from ..querysets import listing_fetch_queryset
 from ..serializers import ListingSerializer
 
 
@@ -33,10 +34,10 @@ class UserListingsView(generics.ListAPIView):
 
     def get_queryset(self):
         user_id = self.kwargs.get("user_id")
-        queryset = Listing.objects.filter(
+        queryset = listing_fetch_queryset().filter(
             user_id=user_id,
             status=Listing.Status.ACTIVE
-        ).select_related("category", "location", "user").prefetch_related("media")
+        )
 
         # Apply filters
         category_slug = self.request.query_params.get("category")

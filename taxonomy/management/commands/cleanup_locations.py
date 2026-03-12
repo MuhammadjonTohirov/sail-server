@@ -2,12 +2,13 @@
 Clean up duplicate locations and ensure proper hierarchy without deleting.
 This updates existing records and creates missing ones.
 """
-import json
-from pathlib import Path
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from taxonomy.models import Location
+
 from listings.models import Listing
+from taxonomy.models import Location
+
+from ._seed_utils import load_json_records, make_uz_slug, resolve_uzbekistan_data_dir
 
 
 class Command(BaseCommand):
@@ -15,30 +16,28 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--data-dir',
+            "--data-dir",
             type=str,
-            default='resources/uzbekistan-regions-data-master/JSON',
-            help='Path to the directory containing JSON files'
+            default=None,
+            help="Path to the JSON directory or the shared resources root.",
         )
 
     def handle(self, *args, **options):
-        data_dir = Path(options['data_dir'])
-
-        if not data_dir.exists():
-            self.stdout.write(self.style.ERROR(f'Data directory not found: {data_dir}'))
-            return
+        data_dir = resolve_uzbekistan_data_dir(options.get("data_dir"))
+        if not data_dir:
+            raise CommandError("Uzbekistan JSON data directory not found. Pass --data-dir with a valid path.")
 
         try:
             with transaction.atomic():
                 # Step 1: Find or create Uzbekistan
                 self.stdout.write('Setting up Uzbekistan...')
                 uzbekistan, created = Location.objects.get_or_create(
-                    kind='COUNTRY',
-                    name='Uzbekistan',
+                    kind=Location.Kind.COUNTRY,
+                    name="Uzbekistan",
                     defaults={
-                        'name_ru': 'Узбекистан',
-                        'name_uz': 'O\'zbekiston',
-                        'slug': 'uzbekistan',
+                        "name_ru": "Узбекистан",
+                        "name_uz": "O'zbekiston",
+                        "slug": "uzbekistan",
                     }
                 )
                 if created:
@@ -47,18 +46,12 @@ class Command(BaseCommand):
                     self.stdout.write('✓ Uzbekistan exists')
 
                 # Step 2: Load regions from JSON
-                regions_file = data_dir / 'regions.json'
-                if not regions_file.exists():
-                    self.stdout.write(self.style.ERROR('regions.json not found'))
-                    return
-
-                with open(regions_file, 'r', encoding='utf-8-sig') as f:
-                    regions_data = json.load(f)
+                regions_data = load_json_records(data_dir, "regions.json")
 
                 self.stdout.write(f'\nProcessing {len(regions_data)} regions from JSON...')
 
                 # Step 3: Get existing regions
-                existing_regions = Location.objects.filter(kind='REGION')
+                existing_regions = Location.objects.filter(kind=Location.Kind.REGION)
                 self.stdout.write(f'Found {existing_regions.count()} existing REGION entries')
 
                 # Step 4: Delete English-named duplicates (Fergana Region, Andijan Region, etc.)
@@ -106,7 +99,7 @@ class Command(BaseCommand):
                         existing.name = name_uz
                         existing.name_ru = name_ru
                         existing.name_uz = name_uz
-                        existing.slug = self._make_slug(name_uz)
+                        existing.slug = make_uz_slug(name_uz)
                         existing.parent = uzbekistan
                         existing.save()
                         self.stdout.write(f'  ✓ Updated: {name_ru}')
@@ -114,12 +107,12 @@ class Command(BaseCommand):
                     else:
                         # Create new
                         location = Location.objects.create(
-                            kind='REGION',
+                            kind=Location.Kind.REGION,
                             parent=uzbekistan,
                             name=name_uz,
                             name_ru=name_ru,
                             name_uz=name_uz,
-                            slug=self._make_slug(name_uz)
+                            slug=make_uz_slug(name_uz)
                         )
                         self.stdout.write(f'  ✓ Created: {name_ru}')
 
@@ -158,11 +151,10 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(f'✓ Deleted {count} unused English regions'))
 
                 # Step 8: Import districts
-                districts_file = data_dir / 'districts.json'
+                districts_file = data_dir / "districts.json"
                 if districts_file.exists():
                     self.stdout.write('\nProcessing districts...')
-                    with open(districts_file, 'r', encoding='utf-8-sig') as f:
-                        districts_data = json.load(f)
+                    districts_data = load_json_records(data_dir, "districts.json")
 
                     district_count = 0
                     for district_data in districts_data:
@@ -177,19 +169,19 @@ class Command(BaseCommand):
 
                         # Check if exists
                         existing_district = Location.objects.filter(
-                            kind='DISTRICT',
+                            kind=Location.Kind.DISTRICT,
                             parent=parent_location,
                             name_uz=name_uz
                         ).first()
 
                         if not existing_district:
                             Location.objects.create(
-                                kind='DISTRICT',
+                                kind=Location.Kind.DISTRICT,
                                 parent=parent_location,
                                 name=name_uz,
                                 name_ru=name_ru,
                                 name_uz=name_uz,
-                                slug=self._make_slug(name_uz)
+                                slug=make_uz_slug(name_uz)
                             )
                             district_count += 1
 
@@ -201,27 +193,9 @@ class Command(BaseCommand):
                     f'\n✅ Cleanup complete!'
                 ))
                 self.stdout.write(f'   Total locations: {Location.objects.count()}')
-                self.stdout.write(f'   - Regions: {Location.objects.filter(kind="REGION").count()}')
-                self.stdout.write(f'   - Districts: {Location.objects.filter(kind="DISTRICT").count()}')
+                self.stdout.write(f'   - Regions: {Location.objects.filter(kind=Location.Kind.REGION).count()}')
+                self.stdout.write(f'   - Districts: {Location.objects.filter(kind=Location.Kind.DISTRICT).count()}')
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'❌ Error: {str(e)}'))
             raise
-
-    def _make_slug(self, name):
-        """Create URL-safe slug from Uzbek/Russian text"""
-        replacements = {
-            'ʻ': '', "'": '', '\'': '',
-            'ў': 'o', 'ғ': 'g', 'қ': 'q',
-            'ҳ': 'h', 'Ў': 'O', 'Ғ': 'G',
-            'Қ': 'Q', 'Ҳ': 'H', ' ': '-',
-        }
-
-        slug = name.lower()
-        for old, new in replacements.items():
-            slug = slug.replace(old, new)
-
-        slug = ''.join(c if c.isalnum() or c == '-' else '-' for c in slug)
-        slug = '-'.join(filter(None, slug.split('-')))
-
-        return slug[:255]

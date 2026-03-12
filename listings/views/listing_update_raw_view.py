@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from ..models import Listing
 from ..serializers import ListingCreateSerializer, ListingSerializer
+from ..utils import sync_listing_contact_phone_mask
 from taxonomy.models import Category, Location
 
 
@@ -144,6 +145,7 @@ class ListingUpdateRawView(APIView):
         listing.contact_name = contact_name if contact_name is not None else listing.contact_name
         listing.contact_phone = contact_phone if contact_phone is not None else listing.contact_phone
 
+        sync_listing_contact_phone_mask(listing)
         listing.save()
 
         # Handle attributes if provided

@@ -44,7 +44,8 @@ class ListingInterestView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Increment the interest count
-        Listing.objects.filter(id=pk).update(interest_count=F('interest_count') + 1)
+        tracked = not request.user.is_authenticated or request.user.id != listing.user_id
+        if tracked:
+            Listing.objects.filter(id=pk).update(interest_count=F("interest_count") + 1)
 
-        return Response({"tracked": True}, status=status.HTTP_200_OK)
+        return Response({"tracked": tracked}, status=status.HTTP_200_OK)
