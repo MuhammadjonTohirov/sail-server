@@ -150,11 +150,8 @@ else:
         raise ValueError("CORS_ALLOWED_ORIGINS must be set in production!")
     CORS_ALLOWED_ORIGINS = origins
     
-    # CSRF trusted origins for production
+    # CSRF trusted origins mirror the allowed CORS origins
     CSRF_TRUSTED_ORIGINS = origins.copy()
-    # Add .onrender.com wildcard if not in origins
-    if not any('.onrender.com' in o for o in origins):
-        CSRF_TRUSTED_ORIGINS.append('https://*.onrender.com')
 
 # CORS credentials
 CORS_ALLOW_CREDENTIALS = True
@@ -297,15 +294,3 @@ if not _chat_attachment_prefixes:
     if media_url.startswith(("http://", "https://")):
         _chat_attachment_prefixes.append(media_url)
 CHAT_ATTACHMENT_ALLOWED_URL_PREFIXES = _chat_attachment_prefixes
-
-# Security settings for production
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
