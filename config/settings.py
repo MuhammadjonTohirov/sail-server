@@ -149,9 +149,17 @@ else:
     if not origins:
         raise ValueError("CORS_ALLOWED_ORIGINS must be set in production!")
     CORS_ALLOWED_ORIGINS = origins
-    
-    # CSRF trusted origins mirror the allowed CORS origins
-    CSRF_TRUSTED_ORIGINS = origins.copy()
+
+    csrf_origins = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+    if not csrf_origins:
+        csrf_origins = origins.copy()
+        for host in ALLOWED_HOSTS:
+            if host in {"*", "localhost", "127.0.0.1"} or host.startswith("."):
+                continue
+            csrf_origin = f"https://{host}"
+            if csrf_origin not in csrf_origins:
+                csrf_origins.append(csrf_origin)
+    CSRF_TRUSTED_ORIGINS = csrf_origins
 
 # CORS credentials
 CORS_ALLOW_CREDENTIALS = True
