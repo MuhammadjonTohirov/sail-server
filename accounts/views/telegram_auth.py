@@ -101,8 +101,16 @@ class TelegramLoginView(APIView):
         data = serializer.validated_data
         telegram_id = data["id"]
 
-        # Verify signature
-        if not self._verify_hash(data, bot_token):
+        # Verify signature.
+        #
+        # IMPORTANT: Telegram computes the hash over ONLY the fields it actually
+        # included in the login payload. We must therefore build the
+        # data_check_string from the RAW request fields (request.data), not from
+        # the serializer's validated_data -- the serializer can coerce types and
+        # callers often forward optional fields (last_name, photo_url) as empty
+        # strings that Telegram never signed. Including those breaks the HMAC and
+        # causes spurious "Invalid Telegram login signature" failures.
+        if not self._verify_hash(request.data, bot_token):
             logger.warning(
                 f"Invalid Telegram login signature for telegram_id={telegram_id}, "
                 f"ip={request.META.get('REMOTE_ADDR')}"
@@ -235,13 +243,25 @@ class TelegramLoginView(APIView):
 
     @staticmethod
     def _verify_hash(data: dict, bot_token: str) -> bool:
-        """Verify Telegram login widget signature."""
-        received_hash = data.get("hash", "")
+        """Verify Telegram login widget signature.
+
+        Per the Telegram spec, the data_check_string is built from every field
+        Telegram sent EXCEPT ``hash``, sorted by key, joined as ``key=value``
+        with newlines. Telegram omits optional fields it has no value for, so we
+        must also skip keys whose value is empty/None here -- otherwise a caller
+        that forwards ``last_name=""`` / ``photo_url=""`` (which Telegram never
+        signed) would produce a mismatching data_check_string.
+        """
+        received_hash = str(data.get("hash", "") or "")
+        if not received_hash:
+            return False
+
         payload_items = []
         for key in sorted(k for k in data.keys() if k != "hash"):
             value = data[key]
-            if value is None:
-                value = ""
+            # Telegram never signs fields it didn't send; treat empty/None as absent.
+            if value is None or value == "":
+                continue
             payload_items.append(f"{key}={value}")
         data_check_string = "\n".join(payload_items)
         secret_key = hashlib.sha256(bot_token.encode()).digest()

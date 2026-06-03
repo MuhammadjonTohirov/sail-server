@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import OtpCode, Profile
+from ..notifications import send_otp_email
 from ..serializers import (
     ForgotPasswordSerializer,
     LoginSerializer,
@@ -100,6 +101,11 @@ class RegisterView(APIView):
             minutes_valid=5,
             ip=request.META.get("REMOTE_ADDR")
         )
+
+        # Deliver the code. Email is supported now; phone/SMS delivery is not yet
+        # wired to a provider, so phone registrations rely on the DEBUG code path.
+        if email:
+            send_otp_email(email, code, purpose="register")
 
         # Store registration info in session/cache
         # For simplicity, we'll return a token that needs to be sent back
@@ -383,6 +389,9 @@ class ForgotPasswordView(APIView):
             minutes_valid=5,
             ip=request.META.get("REMOTE_ADDR")
         )
+
+        if email:
+            send_otp_email(email, code, purpose="password_reset")
 
         payload = {"status": "sent"}
         if os.environ.get("DJANGO_DEBUG", "True").lower() in {"1", "true", "yes"}:

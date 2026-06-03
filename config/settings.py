@@ -202,6 +202,7 @@ if not DEBUG:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
         "otp": "3/minute",
         "login": "5/minute",
+        "auth": "10/minute",
         "anon": "100/hour",
     }
 
@@ -268,6 +269,42 @@ TELEGRAM_LOGIN_MAX_AGE = int(os.environ.get("TELEGRAM_LOGIN_MAX_AGE", "86400")) 
 TELEGRAM_WEBHOOK_SECRET_TOKEN = os.environ.get("TELEGRAM_WEBHOOK_SECRET_TOKEN", "")
 WEB_BASE_URL = os.environ.get("WEB_BASE_URL", "https://sail.uz")
 # In production, set TELEGRAM_WEBHOOK_SECRET_TOKEN: openssl rand -hex 32
+
+# ---------------------------------------------------------------------------
+# Email delivery (OTP codes, password reset, registration verification)
+# ---------------------------------------------------------------------------
+# Backend selection:
+#   - If EMAIL_HOST is configured -> SMTP backend (production).
+#   - Else in DEBUG -> console backend (codes printed to stdout for local dev).
+#   - Else (production with no EMAIL_HOST) -> SMTP backend with empty host,
+#     which will raise loudly on send so misconfiguration is caught immediately
+#     rather than silently dropping verification emails.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in {"1", "true", "yes"}
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False").lower() in {"1", "true", "yes"}
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
+
+# Explicit backend override wins if provided; otherwise auto-select.
+_email_backend_override = os.environ.get("EMAIL_BACKEND", "")
+if _email_backend_override:
+    EMAIL_BACKEND = _email_backend_override
+elif EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+elif DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    # Production without SMTP host configured: keep SMTP backend so sends fail
+    # loudly (caught + logged in the OTP delivery service) instead of being
+    # silently swallowed. Operators MUST set EMAIL_HOST in production.
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Sail <no-reply@sail.uz>")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+# Human-readable product name used in OTP email bodies.
+EMAIL_PRODUCT_NAME = os.environ.get("EMAIL_PRODUCT_NAME", "Sail")
 
 # Logging (basic)
 LOGGING = {
