@@ -19,6 +19,12 @@ class Command(BaseCommand):
             action='store_true',
             help='Delete documents from index that no longer exist in database'
         )
+        parser.add_argument(
+            '--if-empty',
+            action='store_true',
+            help='Only reindex when the index is missing or empty; never fail when '
+                 'OpenSearch is unreachable. Safe to run as a deploy hook.'
+        )
 
     def handle(self, *args, **options):
         client = get_client()
@@ -27,6 +33,22 @@ class Command(BaseCommand):
             return
 
         idx = index_name()
+
+        # Deploy-safe guard: with --if-empty, only reindex a missing/empty index and
+        # never fail when OpenSearch is unreachable (e.g. during a build with no network).
+        if options.get('if_empty'):
+            try:
+                if not client.ping():
+                    self.stdout.write(self.style.WARNING("OpenSearch unreachable; skipping reindex."))
+                    return
+                if client.indices.exists(index=idx) and client.count(index=idx).get("count", 0) > 0:
+                    self.stdout.write("Index already populated; skipping reindex.")
+                    return
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(
+                    f"Could not check index state ({type(e).__name__}); skipping reindex."
+                ))
+                return
 
         # Clear index if requested
         if options.get('clear'):
