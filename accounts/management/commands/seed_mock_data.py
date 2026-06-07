@@ -100,33 +100,26 @@ class Command(BaseCommand):
         if options["clear"]:
             self._clear_dependent_mock_data()
 
-        self.stdout.write(self.style.NOTICE("1/5 Seeding categories..."))
-        category_kwargs = {}
+        self.stdout.write(self.style.NOTICE(
+            "1/3 Initializing reference data "
+            "(currencies, categories, attributes, locations, search index)..."
+        ))
+        init_kwargs = {"full_locations": True}
         if options.get("resources"):
-            category_kwargs["resources"] = options["resources"]
-        if options["clear"]:
-            category_kwargs["clear"] = True
-        if options["refresh_icons"]:
-            category_kwargs["refresh_icons"] = True
-        call_command("init_categories", **category_kwargs)
-
-        self.stdout.write(self.style.NOTICE("2/5 Seeding category attributes..."))
-        attribute_kwargs = {}
-        if options["clear"] or options["clear_attributes"]:
-            attribute_kwargs["clear"] = True
-        call_command("init_category_attributes", **attribute_kwargs)
-
-        self.stdout.write(self.style.NOTICE("3/5 Importing locations..."))
-        location_kwargs = {}
+            init_kwargs["resources"] = options["resources"]
         if options.get("data_dir"):
-            location_kwargs["data_dir"] = options["data_dir"]
+            init_kwargs["data_dir"] = options["data_dir"]
         if options["clear"]:
-            location_kwargs["clear"] = True
+            init_kwargs["clear"] = True
+        if options["clear_attributes"]:
+            init_kwargs["clear_attributes"] = True
+        if options["refresh_icons"]:
+            init_kwargs["refresh_icons"] = True
         if options["regions_only"]:
-            location_kwargs["regions_only"] = True
-        call_command("import_locations", **location_kwargs)
+            init_kwargs["regions_only"] = True
+        call_command("init", **init_kwargs)
 
-        self.stdout.write(self.style.NOTICE("4/5 Seeding mock users..."))
+        self.stdout.write(self.style.NOTICE("2/3 Seeding mock users..."))
         user_kwargs = {
             "count": options["users"],
             "output": options["output"],
@@ -135,7 +128,7 @@ class Command(BaseCommand):
             user_kwargs["clear"] = True
         call_command("seed_mock_users", **user_kwargs)
 
-        self.stdout.write(self.style.NOTICE("5/5 Seeding mock listings..."))
+        self.stdout.write(self.style.NOTICE("3/3 Seeding mock listings..."))
         listing_kwargs = {
             "count": options["listings"],
             "images_per_listing": options["images_per_listing"],
