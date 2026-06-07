@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from taxonomy.models import Attribute, Category, Location
 
@@ -68,6 +69,16 @@ class Listing(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover
         return self.title
+
+    @property
+    def price_display(self) -> str:
+        """Human-readable price for cards and share previews, e.g. "1 500 USD"."""
+        if self.deal_type == self.DealType.FREE:
+            return gettext("Бесплатно")
+        if not self.price_amount or self.price_amount <= 0:
+            return gettext("Договорная")
+        amount = f"{self.price_amount:,.0f}".replace(",", " ")
+        return f"{amount} {self.price_currency}"
 
 
 class ListingAttributeValue(models.Model):

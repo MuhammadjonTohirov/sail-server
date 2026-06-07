@@ -29,8 +29,8 @@ class TelegramSharingService:
         frontend_url = settings.WEB_BASE_URL.rstrip("/") if hasattr(settings, "WEB_BASE_URL") else "https://sail.uz"
         listing_url = f"{frontend_url}/l/{listing.id}"
         
-        price_text = f"{listing.price_amount:,.0f}".replace(",", " ") + f" {listing.price_currency}" if listing.price_amount else "Договорная"
-        
+        price_text = listing.price_display
+
         # Hashtags from category hierarchy
         hashtags = []
         cat = listing.category

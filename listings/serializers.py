@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any, Dict, List
 
 from django.conf import settings
+from django.urls import reverse
 from rest_framework import serializers
 
 from taxonomy.models import Attribute
@@ -46,6 +47,7 @@ class ListingSerializer(serializers.ModelSerializer):
     contact_phone_masked = serializers.SerializerMethodField()
     contact_email = serializers.SerializerMethodField()
     contact_phone = serializers.SerializerMethodField()
+    share_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -83,6 +85,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "view_count",
             "favorite_count",
             "interest_count",
+            "share_url",
         ]
         read_only_fields = [
             "status",
@@ -96,6 +99,14 @@ class ListingSerializer(serializers.ModelSerializer):
             "favorite_count",
             "interest_count",
         ]
+
+    def get_share_url(self, obj: Listing) -> str:
+        """Public unfurl URL (OpenGraph page) suitable for sharing in chats."""
+        path = reverse("listing-og-preview", args=[obj.id])
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(path)
+        return f"{settings.WEB_BASE_URL.rstrip('/')}{path}"
 
     def get_attributes(self, obj: Listing) -> List[Dict[str, Any]]:  # pragma: no cover
         rows = getattr(obj, "prefetched_attribute_values", None)

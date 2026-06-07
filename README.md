@@ -23,11 +23,26 @@ pip install --upgrade pip
 pip install -r requirements.txt
 cp .env.example .env
 python manage.py migrate
-python manage.py seed_taxonomy  # optional sample categories/locations
+python manage.py init  # bootstrap currencies, categories, attributes, locations, search index
 python manage.py runserver 0.0.0.0:8080
 ```
 
 The copied `.env` enables `DJANGO_DEBUG=1`, so the server boots locally without extra production-only settings.
+
+### Bootstrapping reference data
+
+`init` sets up the foundational reference data a fresh install needs and is safe to
+re-run (every step is idempotent):
+
+```bash
+python manage.py init                 # currencies, categories + attributes, locations, search index
+python manage.py init --full-locations  # use the full region/district dataset instead of built-in cities
+python manage.py init --with-admin    # also create a superuser (dev only)
+python manage.py init --clear         # destructive: rebuild categories and locations from scratch
+```
+
+It does **not** create mock users or listings — use `seed_mock_data` for a fully
+populated dev environment (it runs `init` first, then adds mock content).
 
 ### Optional Local Services
 
