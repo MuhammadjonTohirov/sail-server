@@ -211,7 +211,10 @@ if not DEBUG:
         "otp": "3/minute",
         "login": "5/minute",
         "auth": "10/minute",
-        "anon": "100/hour",
+        # Per-minute (not hourly) so a browsing spike self-clears in <=60s
+        # instead of locking the IP out for ~27min. AnonRateThrottle is keyed
+        # by IP, and many mobile/NAT users share one IP, so keep this generous.
+        "anon": "120/minute",
     }
 
 # OpenSearch
