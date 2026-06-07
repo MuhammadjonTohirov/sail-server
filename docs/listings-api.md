@@ -216,6 +216,7 @@ Typical listing response fields:
 - `view_count`
 - `favorite_count`
 - `interest_count`
+- `share_url` — absolute URL of the public share/preview page (see [Link Previews](#link-previews-opengraph)). Use this when sharing a listing in chats/social apps so it unfurls into a rich card.
 
 ### Visibility Rules
 
@@ -551,6 +552,38 @@ Behavior:
 - validates that the chat IDs belong to the current user
 - only active Telegram chat configs are accepted
 - starts async Telegram sharing
+
+## Link Previews (OpenGraph)
+
+When a listing link is pasted into Telegram, WhatsApp, Facebook, X, etc., those
+crawlers fetch the URL and build a preview card from the page's OpenGraph and
+Twitter Card meta tags. The SPA at `WEB_BASE_URL` is client-rendered and exposes
+no tags to crawlers, so the backend serves a dedicated, server-rendered preview
+page:
+
+`GET /l/<id>` (note: site root, **not** under `/api/v1`)
+
+- Public, unauthenticated, active listings only (404 otherwise).
+- Returns HTML carrying `og:title`, `og:description`, `og:image` (absolute),
+  `og:site_name`, `og:url`, `product:price:*`, and `twitter:card` tags.
+- The card title mirrors marketplace convention: `"<title>: <price> - <category>, <location>"`.
+- Real browsers are redirected to the SPA listing screen (`WEB_BASE_URL/l/<id>`);
+  crawlers keep the meta tags.
+
+Clients should share the `share_url` field returned on the listing object — it
+points to this page, so the link unfurls into a rich card.
+
+### Serving the preview on the main domain
+
+`share_url` resolves to the **backend** host (e.g. `https://api.sail.uz/l/<id>`),
+which works out of the box. To unfurl the prettier main-domain URL
+(`https://sail.uz/l/<id>`) like OLX, route it to this endpoint via one of:
+
+- **Edge proxy (recommended):** at the `sail.uz` reverse proxy/CDN, proxy
+  `GET /l/<id>` to the backend's `/l/<id>` for crawler user-agents
+  (`Telegrambot`, `facebookexternalhit`, `WhatsApp`, `Twitterbot`, …) while
+  humans continue to the SPA.
+- **Frontend SSR:** have the SPA server-render the same OpenGraph tags.
 
 ## Search Listings
 
